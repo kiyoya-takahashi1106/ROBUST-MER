@@ -1,9 +1,13 @@
-import torchaudio
+import torch    
+from torch.utils.data import Dataset
+
+from transformers import Wav2Vec2Processor, VideoMAEImageProcessor
 from decord import VideoReader
+import torchaudio
 
 import random
-import numpy as np
 import pandas as pd
+import numpy as np
 
 
 """
@@ -16,13 +20,48 @@ sentence_emotion_group_dct = {
 }
 
 epoch_data = [
-    [group1の任意のdata, group2の任意のdata, group3の任意のdata, group4の任意のdata, 1~6の感情ラベル],
+    [group1の任意のdatatensor, group2の任意のdatatensor, group3の任意のdatatensor, group4の任意のdatatensor, 1~6の感情ラベル],
     [ , , , , ],
     [ , , , , ],
     ...
     [ , , , , ]
 ]
 """
+
+
+class CREMADDataProvider:
+    def __init__(self, input_modality):
+        self.input_modality = input_modality
+        self.sentence_emotion_group_dct = cremed_classification()
+        self.train_dataset, self.val_dataset = make_data_combination(self.sentence_emotion_group_dct)
+
+    def get_dataset(self):
+        return self.train_dataset, self.val_dataset
+    
+
+
+class CREMADDataset(Dataset):
+    def __init__(self, data, input_modality):
+        self.input_modality = input_modality
+        self.data = data
+
+        if (self.input_modality == "audio") :
+            self.processor = Wav2Vec2Processor.from_pretrained("microsoft/wavlm-base")
+        elif (self.input_modality == "video"):
+            self.processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, index):
+        sample = self.data[index]
+        group1_file, group2_file, group3_file, group4_file, label = sample
+        group1 = pre_process(group1_file, self.input_modality, self.processor)
+        group2 = pre_process(group2_file, self.input_modality, self.processor)
+        group3 = pre_process(group3_file, self.input_modality, self.processor)
+        group4 = pre_process(group4_file, self.input_modality, self.processor)
+        return group1, group2, group3, group4, label
+
 
 
 # すべてのXXデータを (テキスト12 × 感情6) × grpoup4 に分類する
@@ -60,7 +99,7 @@ def cremed_classification():
         sentence_emotion = part[1] + "_" + part[2]
         strong = part[3]
 
-        if not strong == "XX":
+        if (strong != "XX"):
             continue
 
         if sentence_emotion not in sentence_emotion_group_dct:
@@ -75,8 +114,8 @@ def cremed_classification():
 
 # 各グループのデータを最大長に合わせて拡張し、train/valデータを作成 (要素はfilename)
 def make_data_combination(sentence_emotion_group_dct):
-    epoch_train_data = []
-    epoch_val_data = []
+    train_data = []
+    val_data = []
     emotion_label_dct = {"ANG": 0, "DIS": 1, "FEA": 2, "HAP": 3, "NEU": 4, "SAD": 5}
 
     for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
@@ -99,24 +138,25 @@ def make_data_combination(sentence_emotion_group_dct):
                 while len(extended) < needed:
                     # 元のグループから循環的に追加
                     extended.extend(filename_lst[:min(len(filename_lst), needed - len(extended))])
-                # 拡張したデータをシャッフルして追加
                 group_dct[group_num] = filename_lst + extended
                 random.shuffle(group_dct[group_num])
 
+        # train/val分割
         for i in range(max_len):
             train_num = int(max_len * 0.8)
-            if (i < train_num):
-                epoch_train_data.append([group_dct[1][i], group_dct[2][i], group_dct[3][i], group_dct[4][i], label])
-            else:
-                epoch_val_data.append([group_dct[1][i], group_dct[2][i], group_dct[3][i], group_dct[4][i], label])
+            sample = [group_dct[1][i], group_dct[2][i], group_dct[3][i], group_dct[4][i], label]
 
-    return epoch_train_data, epoch_val_data
+            if (i < train_num):
+                train_data.append(sample)
+            else:
+                val_data.append(sample)
+
+    return train_data, val_data
 
 
 
 # 指定されたファイルの各データに対して前処理を行いテンソルで返す
 def pre_process(filename, input_modality, processor):
-    # ファイルパス構築
     parent_dir = "AudioWAV" if input_modality == "audio" else "VideoFlash"
     file_path = f"../data/CREMA-D/raw/{parent_dir}/{filename}"
     
@@ -127,12 +167,14 @@ def pre_process(filename, input_modality, processor):
             waveform = waveform.mean(dim=0, keepdim=True)
         if sr != 16000:
             waveform = torchaudio.functional.resample(waveform, sr, 16000)
-        result = processor(waveform.squeeze(0), sampling_rate=16000, return_tensors="pt")
+        tensor = processor(waveform.squeeze(0), sampling_rate=16000, return_tensors="pt")
+        tensor = tensor.input_values.squeeze(0)
     
     elif (input_modality == "video"):
         vr = VideoReader(file_path)
         indices = np.linspace(0, len(vr) - 1, 16).astype(int)
         frames = [vr[i].asnumpy() for i in indices]
-        result = processor(frames, return_tensors="pt")
-    
-    return result
+        tensor = processor(frames, return_tensors="pt")
+        tensor = tensor.pixel_values.squeeze(0)
+
+    return tensor   

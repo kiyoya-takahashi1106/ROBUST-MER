@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter  # TensorBoard用
 
 from model.pretrain_model import PretrainModel
 
@@ -13,8 +13,9 @@ import numpy as np
 import argparse
 from tqdm import tqdm
 
-from utils.function import COSLOSS, DIFFLOSS, MSELOSS
 from utils.utility import set_seed
+from utils.dataset import CREMADDataProvider, CREMADDataset
+from utils.function import COSLOSS, DIFFLOSS, MSELOSS
 
 print(torch.__version__)
 
@@ -49,12 +50,6 @@ def train(args):
     scaler = torch.amp.GradScaler('cuda')
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
-
-    # datasets, dataloaders
-    train_dataset = CREMADDataset(root=f"data/{args.dataset_name}", split="train", input_modality=args.input_modality)
-    train_data_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False)
-    test_dataset = CREMADDataset(root=f"data/{args.dataset_name}", split="test", input_modality=args.input_modality)
-    test_data_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False)
     
     # モデル全体をGPUに移動
     model = model.to(device)
@@ -76,9 +71,17 @@ def train(args):
         avg_task_loss = []
         avg_loss = []
 
-        for batch in tqdm(train_data_loader):
+        # dataloaderの準備
+        data_provider = CREMADDataProvider(input_modality=args.input_modality)
+        train_data, val_data = data_provider.get_dataset()
+        train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
+        val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
+        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+        val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+
+        for batch in tqdm(train_dataloader):
             # バッチから画像、テキスト、ラベルを取得
-            group1s, group2s, group3s, group4s, labels, lengths = batch
+            group1s, group2s, group3s, group4s, labels = batch
             group1s = group1s.to(device)
             group2s = group2s.to(device)
             group3s = group3s.to(device)
@@ -86,7 +89,7 @@ def train(args):
             labels = labels.to(device)
             
             # モデルの順伝搬
-            y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s, lengths)
+            y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s)
 
             # 損失計算
             sim_loss = COSLOSS(s_lst)
@@ -137,15 +140,15 @@ def train(args):
         with torch.no_grad():
             correct = 0
             total = 0
-            for _, batch in enumerate(tqdm(test_data_loader)):
-                group1s, group2s, group3s, group4s, labels, lengths = batch
+            for _, batch in enumerate(tqdm(val_dataloader)):
+                group1s, group2s, group3s, group4s, labels = batch
                 group1s = group1s.to(device)
                 group2s = group2s.to(device)
                 group3s = group3s.to(device)
                 group4s = group4s.to(device)
                 labels = labels.to(device)
 
-                y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s, lengths)
+                y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s)
 
                 predictions = y.argmax(dim=1)
                 correct += (predictions == labels).sum().item()
@@ -160,6 +163,7 @@ def train(args):
         print(f"Epoch {epoch} Acc: {acc}")
 
         if (acc >= max(acc_lst)):
+            os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
                        f"saved_models/pretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
             print(f"We’ve saved the new model.")
