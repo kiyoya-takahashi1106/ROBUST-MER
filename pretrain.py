@@ -1,0 +1,190 @@
+# データセットを用いて直接学習する.
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter  # TensorBoard用
+
+from model.pretrain_model import PretrainModel
+
+import os
+import numpy as np
+import argparse
+from tqdm import tqdm
+
+from utils.function import COSLOSS, DIFFLOSS, MSELOSS
+from utils.utility import set_seed
+
+print(torch.__version__)
+
+
+def args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--seed", default=42, type=int)
+    parser.add_argument("--lr", default=1e-4, type=float)
+    parser.add_argument("--dropout_rate", default=0.5, type=float)
+    parser.add_argument("--epochs", default=100, type=int)
+    parser.add_argument("--batch_size", default=20, type=int)
+    parser.add_argument("--dataset_name", default="CREMA-D", type=str)
+    parser.add_argument("--class_num", default=6, type=int)
+    parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
+    parser.add_argument("--input_dim_audio", default=74, type=int)
+    parser.add_argument("--input_dim_video", default=47, type=int, help="47 for MOSI, 512 for MOSEI")
+    parser.add_argument("--hidden_dim", default=128, type=int)
+    parser.add_argument("--bert_model_name", default="bert-base-uncased", type=str)
+    args = parser.parse_args()
+    return args
+
+
+def train(args):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = PretrainModel(input_modality=args.input_modality, input_dim_video=args.input_dim_video, input_dim_audio=args.input_dim_audio, hidden_dim=args.hidden_dim, num_classes=args.class_num, bert_model_name=args.bert_model_name, dropout_rate=args.dropout_rate)
+    
+    # TensorBoard Writer設定
+    log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}")
+    writer = SummaryWriter(log_dir=log_dir)
+    print(f"TensorBoard logs will be saved to: {log_dir}")
+
+    scaler = torch.amp.GradScaler('cuda')
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
+
+    # datasets, dataloaders
+    train_dataset = CREMADDataset(root=f"data/{args.dataset_name}", split="train", input_modality=args.input_modality)
+    train_data_loader = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=False)
+    test_dataset = CREMADDataset(root=f"data/{args.dataset_name}", split="test", input_modality=args.input_modality)
+    test_data_loader = DataLoader(dataset=test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=False)
+    
+    # モデル全体をGPUに移動
+    model = model.to(device)
+
+    os.makedirs("saved_models", exist_ok=True)
+
+    acc_lst = []
+    sim_loss_lst = []
+    diff_loss_lst = []
+    recon_loss_lst = []
+    task_loss_lst = []
+    loss_lst = []
+
+    for epoch in tqdm(range(args.epochs)):
+        model.train()
+        avg_sim_loss = []
+        avg_diff_loss = []
+        avg_recon_loss = []
+        avg_task_loss = []
+        avg_loss = []
+
+        for batch in tqdm(train_data_loader):
+            # バッチから画像、テキスト、ラベルを取得
+            group1s, group2s, group3s, group4s, labels, lengths = batch
+            group1s = group1s.to(device)
+            group2s = group2s.to(device)
+            group3s = group3s.to(device)
+            group4s = group4s.to(device)
+            labels = labels.to(device)
+            
+            # モデルの順伝搬
+            y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s, lengths)
+
+            # 損失計算
+            sim_loss = COSLOSS(s_lst)
+            diff_loss = DIFFLOSS(s_lst, p_lst)
+            recon_loss = MSELOSS(f_lst, r_lst)
+            task_loss = F.cross_entropy(y, labels)
+
+            loss = sim_loss + diff_loss + recon_loss + task_loss
+
+            avg_sim_loss.append(sim_loss.item())
+            avg_diff_loss.append(diff_loss.item())
+            avg_recon_loss.append(recon_loss.item())
+            avg_task_loss.append(task_loss.item())
+            avg_loss.append(loss.item())
+
+            optimizer.zero_grad()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+        scheduler.step()
+        epoch_sim_loss = np.mean(avg_sim_loss)
+        epoch_diff_loss = np.mean(avg_diff_loss)
+        epoch_recon_loss = np.mean(avg_recon_loss)
+        epoch_task_loss = np.mean(avg_task_loss)
+        epoch_loss = np.mean(avg_loss)
+
+        sim_loss_lst.append(epoch_sim_loss)
+        diff_loss_lst.append(epoch_diff_loss)
+        recon_loss_lst.append(epoch_recon_loss)
+        task_loss_lst.append(epoch_task_loss)
+        epoch_avg_loss = epoch_loss
+        loss_lst.append(epoch_avg_loss)
+
+        # TensorBoard: エポックレベルでの記録
+        writer.add_scalars('Loss/Train/Epoch/individual_Losses', {
+            'Similarity': epoch_sim_loss,
+            'Difference': epoch_diff_loss,
+            'Reconstruction': epoch_recon_loss,
+            'Task': epoch_task_loss,
+        }, epoch)
+        writer.add_scalar('Loss/Train/Epoch/Total', epoch_loss, epoch)
+        writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
+        print(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}")
+
+        # Test
+        model.eval()
+        with torch.no_grad():
+            correct = 0
+            total = 0
+            for _, batch in enumerate(tqdm(test_data_loader)):
+                group1s, group2s, group3s, group4s, labels, lengths = batch
+                group1s = group1s.to(device)
+                group2s = group2s.to(device)
+                group3s = group3s.to(device)
+                group4s = group4s.to(device)
+                labels = labels.to(device)
+
+                y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s, lengths)
+
+                predictions = y.argmax(dim=1)
+                correct += (predictions == labels).sum().item()
+                total   += labels.size(0)
+
+            print("correct, total:", correct, total)
+
+        acc = correct / total
+        acc_lst.append(acc)
+
+        writer.add_scalar('Accuracy/Test', acc, epoch)
+        print(f"Epoch {epoch} Acc: {acc}")
+
+        if (acc >= max(acc_lst)):
+            torch.save(model.state_dict(),
+                       f"saved_models/pretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
+            print(f"We’ve saved the new model.")
+        print("----------------------------------------------------------------------------")
+
+    print("best acc: ", max(acc_lst))
+
+    # 最終的な結果をTensorBoardに記録
+    writer.add_hparams({
+        'seed': args.seed,
+        'epochs': args.epochs,
+        'batch_size': args.batch_size,
+        'dataset_name': args.dataset_name,
+        'input_modality': args.input_modality,
+    }, {
+        'best_accuracy': max(acc_lst),
+    })
+
+    writer.close()
+    return
+
+
+if __name__ == "__main__":
+    _args = args()
+    for arg in vars(_args):
+        print(arg, getattr(_args, arg))
+    set_seed(_args.seed)
+    train(_args)
