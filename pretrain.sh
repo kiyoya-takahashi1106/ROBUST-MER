@@ -2,18 +2,20 @@
 SEED=42
 LR=1e-4
 DROPOUT_RATE=0.5
-EPOCHS=100
-BATCH_SIZE=20
+EPOCHS=400
+BATCH_SIZE=130
 DATASET_NAME="CREMA-D"
 CLASS_NUM=6
 INPUT_MODALITY="audio"
-INPUT_DIM_AUDIO=74
-INPUT_DIM_VIDEO=47
-HIDDEN_DIM=128
-BERT_MODEL="bert-base-uncased"
+HIDDEN_DIM=768
+WEIGHT_SIM=10.0
+WEIGHT_DIFF=100.0
+WEIGHT_RECON=0.3
+WEIGHT_TASK=0.8
+
 
 # 動的ログファイル名生成
-LOG_FILE="logs/pretrain/${INPUT_MODALITY}/seed${SEED}_${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
+LOG_FILE="logs/pretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
 
 python -u pretrain.py \
     --seed $SEED \
@@ -24,8 +26,9 @@ python -u pretrain.py \
     --dataset_name $DATASET_NAME \
     --class_num $CLASS_NUM \
     --input_modality  $INPUT_MODALITY \
-    --input_dim_audio $INPUT_DIM_AUDIO \
-    --input_dim_video $INPUT_DIM_VIDEO \
     --hidden_dim $HIDDEN_DIM \
-    --bert_model_name $BERT_MODEL \
+    --weight_sim $WEIGHT_SIM \
+    --weight_diff $WEIGHT_DIFF \
+    --weight_recon $WEIGHT_RECON \
+    --weight_task $WEIGHT_TASK \
     2>&1 | tee "$LOG_FILE"

@@ -8,7 +8,8 @@ def COSLOSS(lst):
     for i in range(len(lst)-1):
         for j in range(i+1, len(lst)):
             loss += torch.mean(1 - cos(lst[i], lst[j]))
-    return loss / ((len(lst)*(len(lst)-1))/2)
+    return loss
+    # return loss / ((len(lst)*(len(lst)-1))/2)
 
 
 
@@ -41,7 +42,8 @@ def DIFFLOSS(s_lst, p_lst):
         for k in range(j+1, len(p_lst)):
             loss += diffloss(p_lst[j], p_lst[k])
 
-    return loss / (len(s_lst) + (len(p_lst)*(len(p_lst)-1))/2)
+    return loss
+    # return loss / (len(s_lst) + (len(p_lst)*(len(p_lst)-1))/2)
 
 
 
@@ -49,4 +51,5 @@ def MSELOSS(f_lst, r_lst):
     loss = 0
     for i in range(len(f_lst)):
         loss += nn.MSELoss()(f_lst[i], r_lst[i])
-    return loss / len(f_lst)
+    return loss
+    # return loss / len(f_lst)

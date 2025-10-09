@@ -1,4 +1,6 @@
-# データセットを用いて直接学習する.
+import warnings
+warnings.filterwarnings("ignore")
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -30,17 +32,23 @@ def args():
     parser.add_argument("--dataset_name", default="CREMA-D", type=str)
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
-    parser.add_argument("--input_dim_audio", default=74, type=int)
-    parser.add_argument("--input_dim_video", default=47, type=int, help="47 for MOSI, 512 for MOSEI")
-    parser.add_argument("--hidden_dim", default=128, type=int)
-    parser.add_argument("--bert_model_name", default="bert-base-uncased", type=str)
+    parser.add_argument("--hidden_dim", default=768, type=int)
+    parser.add_argument("--weight_sim", default=10, type=float)
+    parser.add_argument("--weight_diff", default=100, type=float)
+    parser.add_argument("--weight_recon", default=0.3, type=float)
+    parser.add_argument("--weight_task", default=0.6, type=float)
     args = parser.parse_args()
     return args
 
 
 def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = PretrainModel(input_modality=args.input_modality, input_dim_video=args.input_dim_video, input_dim_audio=args.input_dim_audio, hidden_dim=args.hidden_dim, num_classes=args.class_num, bert_model_name=args.bert_model_name, dropout_rate=args.dropout_rate)
+    model = PretrainModel(
+        input_modality=args.input_modality, 
+        hidden_dim=args.hidden_dim, 
+        num_classes=args.class_num, 
+        dropout_rate=args.dropout_rate
+    )
     
     # TensorBoard Writer設定
     log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}")
@@ -53,8 +61,6 @@ def train(args):
     
     # モデル全体をGPUに移動
     model = model.to(device)
-
-    os.makedirs("saved_models", exist_ok=True)
 
     acc_lst = []
     sim_loss_lst = []
@@ -76,26 +82,30 @@ def train(args):
         train_data, val_data = data_provider.get_dataset()
         train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
         val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
-        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=False)
+        train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
         for batch in tqdm(train_dataloader):
             # バッチから画像、テキスト、ラベルを取得
-            group1s, group2s, group3s, group4s, labels = batch
-            group1s = group1s.to(device)
-            group2s = group2s.to(device)
-            group3s = group3s.to(device)
-            group4s = group4s.to(device)
-            labels = labels.to(device)
-            
+            group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4, label = batch
+            group1 = group1.to(device)
+            group2 = group2.to(device)
+            group3 = group3.to(device)
+            group4 = group4.to(device)
+            attn_mask1 = attn_mask1.to(device)
+            attn_mask2 = attn_mask2.to(device)
+            attn_mask3 = attn_mask3.to(device)
+            attn_mask4 = attn_mask4.to(device)
+            label = label.to(device)
+
             # モデルの順伝搬
-            y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s)
+            y, f_lst, s_lst, p_lst, r_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
 
             # 損失計算
-            sim_loss = COSLOSS(s_lst)
-            diff_loss = DIFFLOSS(s_lst, p_lst)
-            recon_loss = MSELOSS(f_lst, r_lst)
-            task_loss = F.cross_entropy(y, labels)
+            sim_loss = args.weight_sim * COSLOSS(s_lst)
+            diff_loss = args.weight_diff * DIFFLOSS(s_lst, p_lst)
+            recon_loss = args.weight_recon * MSELOSS(f_lst, r_lst)
+            task_loss = args.weight_task * F.cross_entropy(y, label)
 
             loss = sim_loss + diff_loss + recon_loss + task_loss
 
@@ -135,24 +145,29 @@ def train(args):
         writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
         print(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}")
 
+
         # Test
         model.eval()
         with torch.no_grad():
             correct = 0
             total = 0
             for _, batch in enumerate(tqdm(val_dataloader)):
-                group1s, group2s, group3s, group4s, labels = batch
-                group1s = group1s.to(device)
-                group2s = group2s.to(device)
-                group3s = group3s.to(device)
-                group4s = group4s.to(device)
-                labels = labels.to(device)
+                group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4, label = batch
+                group1 = group1.to(device)
+                group2 = group2.to(device)
+                group3 = group3.to(device)
+                group4 = group4.to(device)
+                attn_mask1 = attn_mask1.to(device)
+                attn_mask2 = attn_mask2.to(device)
+                attn_mask3 = attn_mask3.to(device)
+                attn_mask4 = attn_mask4.to(device)
+                label = label.to(device)
 
-                y, f_lst, s_lst, p_lst, r_lst = model(group1s, group2s, group3s, group4s)
+                y, f_lst, s_lst, p_lst, r_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
 
                 predictions = y.argmax(dim=1)
-                correct += (predictions == labels).sum().item()
-                total   += labels.size(0)
+                correct += (predictions == label).sum().item()
+                total   += label.size(0)
 
             print("correct, total:", correct, total)
 

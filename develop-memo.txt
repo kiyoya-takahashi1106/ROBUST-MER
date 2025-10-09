@@ -8,6 +8,8 @@ CMU-MOSEI
 音声特徴量（COVAREP）: 74次元
 テキスト特徴量: 300次元（GloVe埋め込み）
 
-bert CLSトークン使ってる
-
 RoBERTa=768d、VideoMAE-Base=768d、WavLM=768d
+
+
+simLossをcos類似度からMSE
+lossのハイパーパラメーター
