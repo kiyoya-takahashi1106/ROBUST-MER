@@ -1,6 +1,6 @@
 /data/
+/logs/
 /runs/
 /saved_models/
-/logs/
 .env
 __pycache__/
