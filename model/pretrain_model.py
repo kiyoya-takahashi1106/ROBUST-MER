@@ -4,7 +4,7 @@ from transformers import WavLMModel, VideoMAEModel
 
 
 class PretrainModel(nn.Module):
-    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float):
+    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float, pretrained_model_file: str):
         super(PretrainModel, self).__init__()
 
         self.input_modality = input_modality
@@ -15,13 +15,17 @@ class PretrainModel(nn.Module):
 
         if input_modality == "audio":
             self.encoder_model = WavLMModel.from_pretrained("microsoft/wavlm-base")
+            premodel_path = "./saved_models/prepretrain/audio" + pretrained_model_file
         elif input_modality == "video":
             self.encoder_model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-
+            premodel_path = "./saved_models/prepretrain/video" + pretrained_model_file
+        self.load_pretrained_layer_weights(premodel_path)
         for param in self.encoder_model.parameters():
-                param.requires_grad = False
+            param.requires_grad = False
 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
+        for param in self.layer_norm.parameters():
+            param.requires_grad = False
 
         # shared division encoder
         self.shared = nn.Sequential(
@@ -76,6 +80,31 @@ class PretrainModel(nn.Module):
         self.sp_discriminator = nn.Linear(self.hidden_dim, 5)
 
 
+    def load_pretrained_layer_weights(self, path):
+        checkpoint = torch.load(path, map_location="cpu")
+        
+        if "model_state_dict" in checkpoint:
+            state_dict = checkpoint["model_state_dict"]
+        elif "state_dict" in checkpoint:
+            state_dict = checkpoint["state_dict"]
+        else:
+            state_dict = checkpoint
+        
+        encoder_weights = {}
+        layer_norm_weights = {}
+        
+        for key, value in state_dict.items():
+            if key.startswith("encoder_model."):
+                new_key = key.replace("encoder_model.", "")
+                encoder_weights[new_key] = value
+            elif key.startswith("layer_norm."):
+                new_key = key.replace("layer_norm.", "")
+                layer_norm_weights[new_key] = value
+        
+        self.encoder_model.load_state_dict(encoder_weights, strict=False)
+        self.layer_norm.load_state_dict(layer_norm_weights)
+        
+
     def one_forward(self, x, attn_mask, private, recon):
         with torch.no_grad():
             output_encoder_model = self.encoder_model(x, attention_mask=attn_mask)
@@ -84,7 +113,7 @@ class PretrainModel(nn.Module):
                 f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
             elif (self.input_modality == "video"):
                 f = output_encoder_model.last_hidden_state[:, 0, :]
-        f = self.layer_norm(f)
+            f = self.layer_norm(f)
 
         s = self.shared(f)
         p = private(f)

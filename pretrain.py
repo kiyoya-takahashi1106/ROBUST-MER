@@ -32,6 +32,7 @@ def args():
     parser.add_argument("--dataset_name", default="CREMA-D", type=str)
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
+    parser.add_argument("--pretrained_model_file", default=".pth", type=str)
     parser.add_argument("--hidden_dim", default=768, type=int)
     parser.add_argument("--weight_sim", default=1.0, type=float)
     parser.add_argument("--weight_diff", default=1.0, type=float)
@@ -47,7 +48,8 @@ def train(args):
         input_modality=args.input_modality, 
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
-        dropout_rate=args.dropout_rate
+        dropout_rate=args.dropout_rate,
+        pretrained_model_file=args.pretrained_model_file
     )
     
     # TensorBoard Writer設定

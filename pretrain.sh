@@ -7,7 +7,7 @@ BATCH_SIZE=130
 DATASET_NAME="CREMA-D"
 CLASS_NUM=6
 INPUT_MODALITY="audio"
-AUDIO_PRETRAINED_MODEL_FILE=".pth"
+PRETRAINED_MODEL_FILE=".pth"
 HIDDEN_DIM=768
 WEIGHT_SIM=1.0
 WEIGHT_DIFF=1.0
@@ -27,6 +27,7 @@ python -u pretrain.py \
     --dataset_name $DATASET_NAME \
     --class_num $CLASS_NUM \
     --input_modality  $INPUT_MODALITY \
+    --pretrained_model_file $PRETRAINED_MODEL_FILE \
     --hidden_dim $HIDDEN_DIM \
     --weight_sim $WEIGHT_SIM \
     --weight_diff $WEIGHT_DIFF \
