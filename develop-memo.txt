@@ -13,3 +13,4 @@ RoBERTa=768d、VideoMAE-Base=768d、WavLM=768d
 
 simLossをcos類似度からMSE
 lossのハイパーパラメーター
+音声datafile wav
