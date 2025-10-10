@@ -20,7 +20,7 @@ sentence_emotion_group_dct = {
     sentence12_emotion6: {1: [], 2: [], 3: [], 4: []}
 }
 
-epoch_data = [
+train_dataset = [
     [group1の任意のdatatensor, group2の任意のdatatensor, group3の任意のdatatensor, group4の任意のdatatensor, 1~6の感情ラベル],
     [ , , , , ],
     [ , , , , ],
@@ -31,8 +31,7 @@ epoch_data = [
 
 
 class CREMADDataProvider:
-    def __init__(self, input_modality):
-        self.input_modality = input_modality
+    def __init__(self):
         self.sentence_emotion_group_dct = cremed_classification()
         self.train_dataset, self.val_dataset = make_data_combination(self.sentence_emotion_group_dct)
 
@@ -43,8 +42,8 @@ class CREMADDataProvider:
 
 class CREMADDataset(Dataset):
     def __init__(self, data, input_modality):
-        self.input_modality = input_modality
         self.data = data
+        self.input_modality = input_modality
 
         if (self.input_modality == "audio") :
             self.processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
@@ -158,7 +157,7 @@ def make_data_combination(sentence_emotion_group_dct):
 
 # 指定されたファイルの各データに対して前処理を行いテンソルで返す
 def pre_process(filename, input_modality, processor):
-    parent_dir = "AudioWAV" if input_modality == "audio" else "VideoFlash"
+    parent_dir = "AudioMP3" if input_modality == "audio" else "VideoFlash"
     file_path = f"data/CREMA-D/raw/{parent_dir}/{filename}"
     
     # モダリティ別処理

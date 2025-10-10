@@ -12,9 +12,9 @@ VIDEO_PRETRAINED_MODEL_FILE=".pth"
 
 
 # 動的ログファイル名生成
-LOG_FILE="logs/pretrain/${DATASET_NAME}/$(date +%Y%m%d_%H%M%S).log"
+LOG_FILE="logs/train/${DATASET_NAME}/$(date +%Y%m%d_%H%M%S).log"
 
-python -u pretrain.py \
+python -u train.py \
     --seed $SEED \
     --lr $LR \
     --dropout_rate $DROPOUT_RATE \

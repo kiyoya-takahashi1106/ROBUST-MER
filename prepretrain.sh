@@ -1,35 +1,24 @@
 # パラメータ設定
 SEED=42
 LR=1e-4
-DROPOUT_RATE=0.5
 EPOCHS=100
-BATCH_SIZE=130
+BATCH_SIZE=16
 DATASET_NAME="CREMA-D"
 CLASS_NUM=6
 INPUT_MODALITY="audio"
-AUDIO_PRETRAINED_MODEL_FILE=".pth"
 HIDDEN_DIM=768
-WEIGHT_SIM=1.0
-WEIGHT_DIFF=1.0
-WEIGHT_RECON=1.0
-WEIGHT_TASK=1.0
 
 
 # 動的ログファイル名生成
-LOG_FILE="logs/pretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
+LOG_FILE="logs/prepretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
 
-python -u pretrain.py \
+python -u prepretrain.py \
     --seed $SEED \
     --lr $LR \
-    --dropout_rate $DROPOUT_RATE \
     --epochs $EPOCHS \
     --batch_size $BATCH_SIZE \
     --dataset_name $DATASET_NAME \
     --class_num $CLASS_NUM \
     --input_modality  $INPUT_MODALITY \
     --hidden_dim $HIDDEN_DIM \
-    --weight_sim $WEIGHT_SIM \
-    --weight_diff $WEIGHT_DIFF \
-    --weight_recon $WEIGHT_RECON \
-    --weight_task $WEIGHT_TASK \
     2>&1 | tee "$LOG_FILE"

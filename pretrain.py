@@ -16,7 +16,7 @@ import argparse
 from tqdm import tqdm
 
 from utils.utility import set_seed
-from utils.dataset import CREMADDataProvider, CREMADDataset
+from utils.pretrain_dataset import CREMADDataProvider, CREMADDataset
 from utils.function import COSLOSS, DIFFLOSS, MSELOSS
 
 print(torch.__version__)
@@ -33,10 +33,10 @@ def args():
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
     parser.add_argument("--hidden_dim", default=768, type=int)
-    parser.add_argument("--weight_sim", default=10, type=float)
-    parser.add_argument("--weight_diff", default=100, type=float)
-    parser.add_argument("--weight_recon", default=0.3, type=float)
-    parser.add_argument("--weight_task", default=0.6, type=float)
+    parser.add_argument("--weight_sim", default=1.0, type=float)
+    parser.add_argument("--weight_diff", default=1.0, type=float)
+    parser.add_argument("--weight_recon", default=1.0, type=float)
+    parser.add_argument("--weight_task", default=1.0, type=float)
     args = parser.parse_args()
     return args
 
@@ -78,7 +78,7 @@ def train(args):
         avg_loss = []
 
         # dataloaderの準備
-        data_provider = CREMADDataProvider(input_modality=args.input_modality)
+        data_provider = CREMADDataProvider()
         train_data, val_data = data_provider.get_dataset()
         train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
         val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)

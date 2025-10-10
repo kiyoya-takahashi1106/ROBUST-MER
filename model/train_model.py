@@ -33,7 +33,7 @@ class Model(nn.Module):
 
         self.sigmoid = nn.Sigmoid()
 
-        encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=1)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=2)
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=1)
 
         # fusion
