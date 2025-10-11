@@ -13,17 +13,18 @@ class PretrainModel(nn.Module):
         self.dropout_rate = dropout_rate
         self.activation = nn.ReLU()
 
-        if input_modality == "audio":
+        if (input_modality == "audio"):
             self.encoder_model = WavLMModel.from_pretrained("microsoft/wavlm-base")
-            premodel_path = "./saved_models/prepretrain/audio" + pretrained_model_file
-        elif input_modality == "video":
+            premodel_path = "./saved_models/prepretrain/audio/" + pretrained_model_file
+        elif (input_modality == "video"):
             self.encoder_model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-            premodel_path = "./saved_models/prepretrain/video" + pretrained_model_file
+            premodel_path = "./saved_models/prepretrain/video/" + pretrained_model_file
+
+        self.layer_norm = nn.LayerNorm(self.hidden_dim)
+
         self.load_pretrained_layer_weights(premodel_path)
         for param in self.encoder_model.parameters():
             param.requires_grad = False
-
-        self.layer_norm = nn.LayerNorm(self.hidden_dim)
         for param in self.layer_norm.parameters():
             param.requires_grad = False
 

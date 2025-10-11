@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from transformers import AutoFeatureExtractor, VideoMAEImageProcessor
 from decord import VideoReader
 import torchaudio
-torchaudio.set_audio_backend("soundfile")
+# torchaudio.set_audio_backend("soundfile")
 
 import random
 import pandas as pd
@@ -158,12 +158,12 @@ def make_data_combination(sentence_emotion_group_dct):
 
 # 指定されたファイルの各データに対して前処理を行いテンソルで返す
 def pre_process(filename, input_modality, processor):
-    parent_dir = "AudioWAV" if input_modality == "audio" else "VideoFlash"
+    parent_dir = "AudioMP3" if input_modality == "audio" else "VideoFlash"
     file_path = f"data/CREMA-D/raw/{parent_dir}/{filename}"
     
     # モダリティ別処理
     if (input_modality == "audio"):
-        file_path += ".wav"
+        file_path += ".mp3"
         waveform, sr = torchaudio.load(file_path)
         if waveform.size(0) > 1:
             waveform = waveform.mean(dim=0, keepdim=True)
@@ -178,10 +178,12 @@ def pre_process(filename, input_modality, processor):
     elif (input_modality == "video"):
         file_path += ".flv"
         vr = VideoReader(file_path)
-        indices = np.linspace(0, len(vr) - 1, 16).astype(int)
+        T = 16
+        indices = np.linspace(0, len(vr) - 1, T).astype(int)
         frames = [vr[i].asnumpy() for i in indices]
         processor_output = processor(frames, return_tensors="pt")
         result = processor_output['pixel_values'].squeeze(0)
+        attn_mask = torch.ones((T,), dtype=torch.long)   # ★ None を避ける
 
     return result, attn_mask
 

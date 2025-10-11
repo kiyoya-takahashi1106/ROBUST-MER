@@ -100,10 +100,12 @@ def pre_process(filename, input_modality, processor):
     elif (input_modality == "video"):
         file_path += ".flv"
         vr = VideoReader(file_path)
-        indices = np.linspace(0, len(vr) - 1, 16).astype(int)
+        T = 16
+        indices = np.linspace(0, len(vr) - 1, T).astype(int)
         frames = [vr[i].asnumpy() for i in indices]
         processor_output = processor(frames, return_tensors="pt")
         result = processor_output['pixel_values'].squeeze(0)
+        attn_mask = torch.ones((T,), dtype=torch.long)   # ★ None を避ける
 
     return result, attn_mask
 

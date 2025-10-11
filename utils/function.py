@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 
-def COSLOSS(lst):
+def SIMLOSS(lst):
     cos = nn.CosineSimilarity(dim=1, eps=1e-6)
     loss = 0
     for i in range(len(lst)-1):
@@ -47,7 +47,7 @@ def DIFFLOSS(s_lst, p_lst):
 
 
 
-def MSELOSS(f_lst, r_lst):
+def RECONLOSS(f_lst, r_lst):
     loss = 0
     for i in range(len(f_lst)):
         loss += nn.MSELoss()(f_lst[i], r_lst[i])

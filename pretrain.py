@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 from utils.utility import set_seed
 from utils.pretrain_dataset import CREMADDataProvider, CREMADDataset
-from utils.function import COSLOSS, DIFFLOSS, MSELOSS
+from utils.function import SIMLOSS, DIFFLOSS, RECONLOSS
 
 print(torch.__version__)
 
@@ -104,9 +104,9 @@ def train(args):
             y, f_lst, s_lst, p_lst, r_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
 
             # 損失計算
-            sim_loss = args.weight_sim * COSLOSS(s_lst)
+            sim_loss = args.weight_sim * SIMLOSS(s_lst)
             diff_loss = args.weight_diff * DIFFLOSS(s_lst, p_lst)
-            recon_loss = args.weight_recon * MSELOSS(f_lst, r_lst)
+            recon_loss = args.weight_recon * RECONLOSS(f_lst, r_lst)
             task_loss = args.weight_task * F.cross_entropy(y, label)
 
             loss = sim_loss + diff_loss + recon_loss + task_loss

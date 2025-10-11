@@ -31,6 +31,7 @@ def args():
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
     parser.add_argument("--hidden_dim", default=768, type=int)
+    parser.add_argument("--patience", default=5, type=int, help="Early stopping patience")
     args = parser.parse_args()
     return args
 
@@ -64,6 +65,10 @@ def train(args):
 
     acc_lst = []
     loss_lst = []
+    
+    # Early Stopping用の変数
+    best_acc = 0.0
+    patience_counter = 0
 
     for epoch in tqdm(range(args.epochs)):
         model.train()
@@ -76,21 +81,21 @@ def train(args):
             attn_mask = attn_mask.to(device)
             label = label.to(device)
 
-            # モデルの順伝搬
-            y = model(x, attn_mask)
-
-            loss =F.cross_entropy(y, label)
+            optimizer.zero_grad()
+            
+            with torch.amp.autocast(device.type):
+                # モデルの順伝搬
+                y = model(x, attn_mask)
+                loss = F.cross_entropy(y, label)
 
             avg_loss.append(loss.item())
 
-            optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
 
         scheduler.step()
         epoch_loss = np.mean(avg_loss)
-
         loss_lst.append(epoch_loss)
 
         # TensorBoard: エポックレベルでの記録
@@ -101,12 +106,12 @@ def train(args):
         print(f"Epoch {epoch}, loss: {epoch_loss})")
 
 
-        # Test
+        # Validation
         model.eval()
         with torch.no_grad():
             correct = 0
             total = 0
-            for _, batch in enumerate(tqdm(val_dataloader)):
+            for batch in tqdm(val_dataloader):
                 x, attn_mask, label = batch
                 x = x.to(device)
                 attn_mask = attn_mask.to(device)
@@ -127,11 +132,24 @@ def train(args):
         writer.add_scalar('Accuracy/Test', acc, epoch)
         print(f"Epoch {epoch} Acc: {acc}")
 
-        if (acc >= max(acc_lst)):
+        # Best model保存
+        if (acc > best_acc):
+            best_acc = acc
+            patience_counter = 0
+            
             os.makedirs("saved_models/prepretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
                        f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
-            print(f"We’ve saved the new model.")
+            print(f"We've saved the new model.")
+        else:
+            patience_counter += 1
+            print(f"No improvement. Patience: {patience_counter}/{args.patience}")
+            
+            # Early Stopping判定
+            if (patience_counter >= args.patience):
+                print(f"Early stopping triggered at epoch {epoch}")
+                break
+        
         print("----------------------------------------------------------------------------")
 
     print("best acc: ", max(acc_lst))
