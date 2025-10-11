@@ -175,7 +175,7 @@ def train(args):
                 total   += label.size(0)
                 
                 # y の各サンプルの最大値を取得
-                max_values = y.max(dim=1)[0]  # [batch_size] の Tensor
+                max_values = y.max(dim=1)[0]   # [batch_size] の Tensor
                 y_max_values.extend(max_values.cpu().tolist())
 
             print("correct, total:", correct, total)
