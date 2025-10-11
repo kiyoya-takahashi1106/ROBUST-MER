@@ -14,6 +14,7 @@ DATASET = "orvile/crema-d-emotional-multimodal-dataset"
 SKIP_IF_EXISTS = True
 # =========================================
 
+
 def load_credentials():
     # .env を「スクリプト隣 → リポジトリ直下」の順で探す
     for env_path in [Path(__file__).parent / ".env", REPO_ROOT / ".env"]:
@@ -39,6 +40,7 @@ def load_credentials():
     os.environ["KAGGLE_KEY"] = key
     print(f"🔐 認証ユーザー: {username}")
 
+
 def already_extracted(path: Path) -> bool:
     # 代表的なフォルダがあれば解凍済みとみなす（必要に応じ調整）
     for p in [
@@ -63,10 +65,6 @@ def main():
     SAVE_DIR.mkdir(parents=True, exist_ok=True)
     print(f"📁 ダウンロード先: {SAVE_DIR}")
 
-    if SKIP_IF_EXISTS and already_extracted(SAVE_DIR):
-        print("⏭️ 既に展開済みと判定のためダウンロードをスキップします。")
-        return
-
     # 4) 認証 & ダウンロード
     api = KaggleApi()
     api.authenticate()
@@ -80,6 +78,7 @@ def main():
         quiet=False
     )
     print("✅ CREMA-D のダウンロードと解凍が完了しました！")
+
 
 if __name__ == "__main__":
     main()
