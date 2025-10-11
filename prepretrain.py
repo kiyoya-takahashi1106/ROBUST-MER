@@ -107,6 +107,8 @@ def train(args):
         with torch.no_grad():
             correct = 0
             total = 0
+            y_max_values = []   # y の最大値を保存するリスト
+
             for batch in tqdm(val_dataloader):
                 x, attn_mask, label = batch
                 x = x.to(device)
@@ -116,11 +118,20 @@ def train(args):
                 # モデルの順伝搬
                 y = model(x, attn_mask)
 
+                y = F.softmax(y, dim=1)
                 predictions = y.argmax(dim=1)
                 correct += (predictions == label).sum().item()
                 total   += label.size(0)
 
+                # y の各サンプルの最大値を取得
+                max_values = y.max(dim=1)[0]   # [batch_size] の Tensor
+                y_max_values.extend(max_values.cpu().tolist())
+
             print("correct, total:", correct, total)
+
+            # y の最大値の平均を計算
+            avg_y_max = np.mean(y_max_values)
+            print(f"Average of y max values: {avg_y_max:.4f}")
 
         acc = correct / total
         acc_lst.append(acc)
