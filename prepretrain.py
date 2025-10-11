@@ -75,21 +75,17 @@ def train(args):
         avg_loss = []
 
         for batch in tqdm(train_dataloader):
-            # バッチから画像、テキスト、ラベルを取得
             x, attn_mask, label = batch
             x = x.to(device)
             attn_mask = attn_mask.to(device)
             label = label.to(device)
-
-            optimizer.zero_grad()
             
-            with torch.amp.autocast(device.type):
-                # モデルの順伝搬
-                y = model(x, attn_mask)
-                loss = F.cross_entropy(y, label)
+            y = model(x, attn_mask)
 
+            loss = F.cross_entropy(y, label)
             avg_loss.append(loss.item())
 
+            optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
