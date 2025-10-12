@@ -145,7 +145,7 @@ def train(args):
         }, epoch)
         writer.add_scalar('Loss/Train/Epoch/Total', epoch_loss, epoch)
         writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
-        print(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}")
+        tqdm.write(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}")
 
 
         # Test
@@ -178,27 +178,27 @@ def train(args):
                 max_values = y.max(dim=1)[0]   # [batch_size] の Tensor
                 y_max_values.extend(max_values.cpu().tolist())
 
-            print("correct, total:", correct, total)
+            tqdm.write(f"correct, total: {correct}, {total}")
             
             # y の最大値の平均を計算
             avg_y_max = np.mean(y_max_values)
-            print(f"Average of y max values: {avg_y_max:.4f}")
+            tqdm.write(f"Average of y max values: {avg_y_max:.4f}")
 
         acc = correct / total
         acc_lst.append(acc)
 
         writer.add_scalar('Accuracy/Test', acc, epoch)
         writer.add_scalar('Y_Max/Average', avg_y_max, epoch)  # TensorBoard に記録
-        print(f"Epoch {epoch} Acc: {acc}")
+        tqdm.write(f"Epoch {epoch} Acc: {acc}")
 
         if (acc >= max(acc_lst)):
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
                        f"saved_models/pretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
-            print(f"We’ve saved the new model.")
-        print("----------------------------------------------------------------------------")
+            tqdm.write(f"We’ve saved the new model.")
+        tqdm.write("----------------------------------------------------------------------------")
 
-    print("best acc: ", max(acc_lst))
+    tqdm.write(f"best acc: {max(acc_lst)}")
 
     # 最終的な結果をTensorBoardに記録
     writer.add_hparams({
