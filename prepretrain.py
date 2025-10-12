@@ -16,7 +16,7 @@ import argparse
 from tqdm import tqdm
 
 from utils.utility import set_seed
-from utils.prepretrain_dataset import CREMADDataProvider, CREMADDataset
+from utils.prepretrain_dataset2 import CREMADDataProvider, CREMADDataset
 
 print(torch.__version__)
 
@@ -54,7 +54,7 @@ def train(args):
     train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
     val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
 
     scaler = torch.amp.GradScaler('cuda')
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
