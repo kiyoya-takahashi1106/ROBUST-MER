@@ -191,11 +191,10 @@ def train(args):
         writer.add_scalar('Y_Max/Average', avg_y_max, epoch)  # TensorBoard に記録
         tqdm.write(f"Epoch {epoch} Acc: {acc}")
 
-        if (acc >= max(acc_lst)):
-            os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
-            torch.save(model.state_dict(),
-                       f"saved_models/pretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
-            tqdm.write(f"We’ve saved the new model.")
+        os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
+        torch.save(model.state_dict(),
+                    f"saved_models/pretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
+        tqdm.write(f"We’ve saved the new model.")
         tqdm.write("----------------------------------------------------------------------------")
 
     tqdm.write(f"best acc: {max(acc_lst)}")
