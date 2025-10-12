@@ -119,16 +119,17 @@ def cremed_classification():
 
         for group_num in [1, 2, 3, 4]:
             filename_lst = group_dct[group_num].copy()
-            random.shuffle(filename_lst)
             
-            # 最小長に揃える
-            if len(filename_lst) > min_len:
-                filename_lst = filename_lst[:min_len]
+            val_num = int(min_len * 0.2)
+            val_filename_lst = filename_lst[:val_num]
+            random.shuffle(val_filename_lst)
+            val_sentence_emotion_group_dct[sentence_emotion][group_num] = val_filename_lst
 
-            # train/val分割
-            train_num = int(min_len * 0.8)
-            train_sentence_emotion_group_dct[sentence_emotion][group_num] = filename_lst[:train_num]
-            val_sentence_emotion_group_dct[sentence_emotion][group_num] = filename_lst[train_num:]
+            train_filename_lst = filename_lst[val_num:]
+            random.shuffle(train_filename_lst)
+            if (len(train_filename_lst) > min_len-val_num):
+                train_filename_lst = train_filename_lst[:min_len-val_num]
+            train_sentence_emotion_group_dct[sentence_emotion][group_num] = train_filename_lst
 
     return train_sentence_emotion_group_dct, val_sentence_emotion_group_dct
 
