@@ -31,40 +31,35 @@ class PretrainModel(nn.Module):
         # shared division encoder
         self.shared = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
-            # nn.GELU()
         )
 
         # private division encoders
         self.private1 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
-            # nn.GELU()
         )
         self.private2 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
-            # nn.GELU()
         )
         self.private3 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
-            # nn.GELU()
         )
         self.private4 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
-            # nn.GELU()
         )
 
         # reconstruction decoders
-        self.recon1 = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.recon2 = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.recon3 = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.recon4 = nn.Linear(self.hidden_dim, self.hidden_dim)
+        self.recon1 = nn.Linear(self.hidden_dim*2, self.hidden_dim)
+        self.recon2 = nn.Linear(self.hidden_dim*2, self.hidden_dim)
+        self.recon3 = nn.Linear(self.hidden_dim*2, self.hidden_dim)
+        self.recon4 = nn.Linear(self.hidden_dim*2, self.hidden_dim)
 
         # fusion
-        self.fusion = nn.Linear(self.hidden_dim, num_classes)
+        self.fusion = nn.Sequential(
+            nn.LayerNorm(self.hidden_dim),
+            nn.GELU(),
+            nn.Linear(self.hidden_dim, num_classes)
+        )
+
         # self.fusion = nn.Sequential(
         #     # 4group => 2つに圧縮 => class数
         #     nn.Linear(self.hidden_dim*4, self.hidden_dim*2),
@@ -123,7 +118,8 @@ class PretrainModel(nn.Module):
 
         s = self.shared(f)
         p = private(f)
-        r = recon(s + p)
+        sp = torch.cat([s, p], dim=1)
+        r = recon(sp)
 
         return f, s, p, r
 
