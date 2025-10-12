@@ -31,25 +31,30 @@ class PretrainModel(nn.Module):
         # shared division encoder
         self.shared = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.Sigmoid()
+            nn.LayerNorm(self.hidden_dim),
+            # nn.GELU()
         )
 
         # private division encoders
         self.private1 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.Sigmoid()
+            nn.LayerNorm(self.hidden_dim),
+            # nn.GELU()
         )
         self.private2 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.Sigmoid()
+            nn.LayerNorm(self.hidden_dim),
+            # nn.GELU()
         )
         self.private3 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.Sigmoid()
+            nn.LayerNorm(self.hidden_dim),
+            # nn.GELU()
         )
         self.private4 = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
-            nn.Sigmoid()
+            nn.LayerNorm(self.hidden_dim),
+            # nn.GELU()
         )
 
         # reconstruction decoders
