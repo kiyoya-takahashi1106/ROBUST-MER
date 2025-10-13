@@ -47,6 +47,7 @@ class PrepretrainModel(nn.Module):
             outputs = self.encoder_model(pixel_values=x, return_dict=True)
             f = outputs.last_hidden_state[:, 0, :]
         f = self.layer_norm(f)
+        f = nn.GELU()(f)
 
         y = self.decoder(f)
         

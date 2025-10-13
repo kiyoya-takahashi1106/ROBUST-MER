@@ -38,6 +38,7 @@ def args():
     parser.add_argument("--weight_diff", default=1.0, type=float)
     parser.add_argument("--weight_recon", default=1.0, type=float)
     parser.add_argument("--weight_task", default=1.0, type=float)
+    parser.add_argument("--patience", default=5, type=int, help="Early stopping patience")
     args = parser.parse_args()
     return args
 
@@ -64,6 +65,8 @@ def train(args):
     # モデル全体をGPUに移動
     model = model.to(device)
 
+    patience_counter = 0
+
     acc_lst = []
     sim_loss_lst = []
     diff_loss_lst = []
@@ -80,7 +83,7 @@ def train(args):
         avg_loss = []
 
         # dataloaderの準備
-        data_provider = CREMADDataProvider()
+        data_provider = CREMADDataProvider(seed=args.seed)
         train_data, val_data = data_provider.get_dataset()
         train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
         val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
@@ -191,11 +194,21 @@ def train(args):
         writer.add_scalar('Y_Max/Average', avg_y_max, epoch)  # TensorBoard に記録
         tqdm.write(f"Epoch {epoch} Acc: {acc}")
 
-        os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
-        torch.save(model.state_dict(),
-                    f"saved_models/pretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
-        tqdm.write(f"We’ve saved the new model.")
-        tqdm.write("----------------------------------------------------------------------------")
+        if (epoch == 0 or epoch_sim_loss <= min(sim_loss_lst)):
+            patience_counter = 0
+            os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
+            torch.save(model.state_dict(),
+                       f"saved_models/pretrain/{args.input_modality}/epoch{epoch}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}.pth")
+            tqdm.write(f"We’ve saved the new model.")
+        else:
+            patience_counter += 1
+            print(f"No improvement. Patience: {patience_counter}/{args.patience}")
+            
+            # Early Stopping判定
+            if (patience_counter >= args.patience):
+                print(f"Early stopping triggered at epoch {epoch}")
+                break
+        tqdm.write("---------------------------------------------")
 
     tqdm.write(f"best acc: {max(acc_lst)}")
 

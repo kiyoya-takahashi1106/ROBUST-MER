@@ -7,12 +7,13 @@ BATCH_SIZE=140
 DATASET_NAME="CREMA-D"
 CLASS_NUM=6
 INPUT_MODALITY="audio"
-PRETRAINED_MODEL_FILE="CREMA-D_epoch4_0.7456_seed42.pth"
+PRETRAINED_MODEL_FILE="CREMA-D_epoch8_0.7456_seed42.pth"
 HIDDEN_DIM=768
 WEIGHT_SIM=2.0
 WEIGHT_DIFF=50.0
 WEIGHT_RECON=0.3
 WEIGHT_TASK=0.15
+PATIENCE=5
 
 
 # 動的ログファイル名生成
@@ -33,4 +34,5 @@ python -u pretrain.py \
     --weight_diff $WEIGHT_DIFF \
     --weight_recon $WEIGHT_RECON \
     --weight_task $WEIGHT_TASK \
+    --patience $PATIENCE \
     2>&1 | tee "$LOG_FILE"
