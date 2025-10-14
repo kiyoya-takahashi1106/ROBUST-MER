@@ -11,29 +11,29 @@ class PrepretrainModel(nn.Module):
         self.input_modality = input_modality
         self.hidden_dim = hidden_dim
 
-        self.activation = nn.ReLU()
-
         self.num_classes = num_classes
 
         if input_modality == "audio":
             self.encoder_model = WavLMModel.from_pretrained("microsoft/wavlm-base")
         elif input_modality == "video":
             self.encoder_model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
+            self.encoder_model.encoder.layer = self.encoder_model.encoder.layer[:8]
+            self.encoder_model.config.num_hidden_layers = 8 
             lora_cfg = LoraConfig(
-                r=12,              
-                lora_alpha=24,   # r*2 base
+                r=4,              
+                lora_alpha=8,   # r*2 base     
                 lora_dropout=0.1,
                 bias="none",
-                target_modules=["query","key","value","output.dense","attn.proj","qkv","proj"]
+                target_modules=["query","value"]
             )
-            trainable = [(n, p.numel()) for n, p in self.encoder_model.named_parameters() if p.requires_grad]
-            print(f"Trainable params: {sum(p.numel() for _, p in trainable):,}")
             self.encoder_model = get_peft_model(self.encoder_model, lora_cfg)
             for n, p in self.encoder_model.named_parameters():
                 if ("lora_" not in n):
                     p.requires_grad = False
 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
+
+        self.dropout = nn.Dropout(0.3)
 
         self.decoder = nn.Linear(self.hidden_dim, self.num_classes)
 
@@ -48,6 +48,7 @@ class PrepretrainModel(nn.Module):
             f = outputs.last_hidden_state[:, 0, :]
         f = self.layer_norm(f)
         f = nn.GELU()(f)
+        f = self.dropout(f)
 
         y = self.decoder(f)
         

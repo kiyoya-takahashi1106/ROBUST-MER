@@ -39,6 +39,9 @@ class PretrainModel(nn.Module):
         for param in self.layer_norm.parameters():
             param.requires_grad = False
 
+        self.dropout = nn.Dropout(0.3)
+
+
         # shared division encoder
         self.shared = nn.Sequential(
             nn.Linear(self.hidden_dim, self.hidden_dim),
@@ -68,6 +71,7 @@ class PretrainModel(nn.Module):
         self.fusion = nn.Sequential(
             nn.LayerNorm(self.hidden_dim),
             nn.GELU(),
+            nn.Dropout(0.3),
             nn.Linear(self.hidden_dim, num_classes)
         )
 
@@ -126,6 +130,7 @@ class PretrainModel(nn.Module):
             elif (self.input_modality == "video"):
                 f = output_encoder_model.last_hidden_state[:, 0, :]
             f = self.layer_norm(f)
+        f = self.dropout(f)
 
         s = self.shared(f)
         p = private(f)
