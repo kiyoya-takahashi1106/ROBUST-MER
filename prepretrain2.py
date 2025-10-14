@@ -10,7 +10,7 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
-from model.prepretrain_model import PrepretrainModel
+from model.prepretrain_model2 import PrepretrainModel
 
 import os
 import numpy as np
