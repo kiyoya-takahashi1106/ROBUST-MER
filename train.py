@@ -89,8 +89,6 @@ def train(args):
 
             y = model(audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask)
 
-            print("fwafawfawfawfaw", y.shape, label.shape)
-
             task_loss = F.mse_loss(y, label)
 
             avg_task_loss.append(task_loss.item())
