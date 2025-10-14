@@ -14,28 +14,28 @@ import numpy as np
 
 
 class MOSIDataset(Dataset):
-    def __init__(self, dataset, split):
+    def __init__(self, dataset, split, input_modality):
         self.dataset = dataset
         self.split = split
-        self.audio_processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
-        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
-        self.video_processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
+        self.input_modality = input_modality    
+        if (self.input_modality == "audio"):
+            self.processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
+        elif (self.input_modality == "video"):
+            self.processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
         self.filename_list = load_filename_list(dataset, split)
-        self.text, self.text_mask = load_text_data(dataset, split, self.tokenizer, self.filename_list)
 
     def __len__(self):
         return len(self.filename_list)
 
     def __getitem__(self, index):
         filename = self.filename_list[index]
-        audio, video, audio_mask, video_mask, label = pre_process(
+        x, x_mask, label = pre_process(
             self.dataset, 
             self.split, 
             filename,
-            self.audio_processor,
-            self.video_processor
+            self.processor
         )
-        return audio, self.text[index], video, audio_mask, self.text_mask[index], video_mask, label
+        return x, x_mask, label
 
 
 
