@@ -74,7 +74,7 @@ class Model(nn.Module):
 
 
         # fusion
-        transformer_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=2)
+        transformer_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=12)
         self.transformer_encoder = nn.TransformerEncoder(transformer_layer, num_layers=1)
         self.fusion = nn.Sequential(
             nn.Linear(self.hidden_dim*3, self.hidden_dim),
@@ -158,6 +158,7 @@ class Model(nn.Module):
         elif (modality == "text"):
             encoder_output = encoder(x, attention_mask=attn_mask)
             f = encoder_output.last_hidden_state[:, 0, :]  # CLSトークン
+            f = encoder_layer_norm(f)
         elif (modality == "video"):
             with torch.no_grad():
                 encoder_output = encoder(x, attention_mask=attn_mask)
