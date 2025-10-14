@@ -9,14 +9,14 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
 from model.train_model import Model
-
+input
 import os
 import numpy as np
 import argparse
 from tqdm import tqdm
 
 from utils.utility import set_seed
-from utils.pretrain_dataset import 
+from utils.train_dataset import MOSIDataset
 
 print(torch.__version__)
 
@@ -48,7 +48,7 @@ def train(args):
     )
     
     # TensorBoard Writer設定
-    log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}")
+    log_dir = os.path.join("runs", "train", f"{args.dataset_name}", f"seed{args.seed}")
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
@@ -56,15 +56,18 @@ def train(args):
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
 
-    train_dataset = 
+    train_dataset = MOSIDataset(split="train", dataset=args.dataset_name)
+    print("Train dataset size:", len(train_dataset))
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    test_dataset = 
-    test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
-    
+    valid_dataset = MOSIDataset(split="valid", dataset=args.dataset_name)
+    print("Valid dataset size:", len(valid_dataset))
+    valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
+
+
     # モデル全体をGPUに移動 
     model = model.to(device)
 
-    acc_lst = []
+    mae_lst = []
     task_loss_lst = []
 
     for epoch in tqdm(range(args.epochs)):
@@ -81,10 +84,12 @@ def train(args):
             text_attn_mask = text_attn_mask.to(device)
             video_attn_mask = video_attn_mask.to(device)
             label = label.to(device)
+            text_x = text_x.squeeze(1)           
+            text_attn_mask = text_attn_mask.squeeze(1)
 
             y = model(audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask)
 
-            task_loss = F.cross_entropy(y, label)
+            task_loss = F.mse_loss(y, label)
 
             avg_task_loss.append(task_loss.item())
 
@@ -106,9 +111,9 @@ def train(args):
         # Test
         model.eval()
         with torch.no_grad():
-            correct = 0
+            total_mae = 0.0  
             total = 0
-            for _, batch in enumerate(tqdm(test_dataloader)):
+            for _, batch in enumerate(tqdm(valid_dataloader)):
                 audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask, label = batch
                 audio_x = audio_x.to(device)
                 text_x = text_x.to(device)
@@ -117,28 +122,29 @@ def train(args):
                 text_attn_mask = text_attn_mask.to(device)
                 video_attn_mask = video_attn_mask.to(device)
                 label = label.to(device)
+                text_x = text_x.squeeze(1)           
+                text_attn_mask = text_attn_mask.squeeze(1)
 
                 y = model(audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask)
 
-                predictions = y.argmax(dim=1)
-                correct += (predictions == label).sum().item()
-                total   += label.size(0)
+                # MAE を計算
+                mae = torch.abs(y - label).sum().item()
+                total_mae += mae
+                total += label.size(0)
 
-            print("correct, total:", correct, total)
+        avg_mae = total_mae / total
+        mae_lst.append(avg_mae)
 
-        acc = correct / total
-        acc_lst.append(acc)
+        writer.add_scalar('MAE/Test', avg_mae, epoch)
+        print(f"Epoch {epoch} MAE: {avg_mae:.4f}")
 
-        writer.add_scalar('Accuracy/Test', acc, epoch)
-        print(f"Epoch {epoch} Acc: {acc}")
-
-        if (acc >= max(acc_lst)):
+        if (avg_mae <= min(mae_lst)):
             os.makedirs("saved_models/train/" + args.dataset_name, exist_ok=True)
-            torch.save(model.state_dict(), f"saved_models/train/{args.dataset_name}/epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
-            print(f"We’ve saved the new model.")
+            torch.save(model.state_dict(), f"saved_models/train/{args.dataset_name}/epoch{epoch}_{avg_mae:.4f}_seed{args.seed}.pth")
+            print(f"We've saved the new model (MAE: {avg_mae:.4f})")
         print("----------------------------------------------------------------------------")
 
-    print("best acc: ", max(acc_lst))
+    print(f"Best MAE: {min(mae_lst):.4f}")
 
     # 最終的な結果をTensorBoardに記録
     writer.add_hparams({
@@ -149,7 +155,7 @@ def train(args):
         'audio_pretrained_model_file': args.audio_pretrained_model_file,
         'video_pretrained_model_file': args.video_pretrained_model_file,
     }, {
-        'best_accuracy': max(acc_lst),
+        'best_mae': min(mae_lst),
     })
 
     writer.close()

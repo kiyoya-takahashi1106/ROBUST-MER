@@ -7,12 +7,14 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+
 # ================== 設定 ==================
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SAVE_DIR = (REPO_ROOT / "data" / "CREMA-D" / "raw").resolve()
 DATASET = "orvile/crema-d-emotional-multimodal-dataset"
 SKIP_IF_EXISTS = True
 # =========================================
+
 
 
 def load_credentials():
@@ -41,6 +43,7 @@ def load_credentials():
     print(f"🔐 認証ユーザー: {username}")
 
 
+
 def already_extracted(path: Path) -> bool:
     # 代表的なフォルダがあれば解凍済みとみなす（必要に応じ調整）
     for p in [
@@ -53,6 +56,8 @@ def already_extracted(path: Path) -> bool:
         if p.exists():
             return True
     return False
+
+
 
 def main():
     # 1) 認証情報をロードして環境変数にセット
@@ -78,6 +83,7 @@ def main():
         quiet=False
     )
     print("✅ CREMA-D のダウンロードと解凍が完了しました！")
+
 
 
 if __name__ == "__main__":
