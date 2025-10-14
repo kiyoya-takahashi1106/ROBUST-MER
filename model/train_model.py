@@ -194,5 +194,5 @@ class Model(nn.Module):
         fusion_f = self.fusion(fusion_f)
 
         y = self.decoder(fusion_f)
-        
+        y = y.squeeze(-1)
         return y 

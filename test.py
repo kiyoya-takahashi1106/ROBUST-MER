@@ -89,8 +89,6 @@ def train(args):
 
             y = model(audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask)
 
-            print("fwafawfawfawfaw", y.shape, label.shape)
-
             task_loss = F.mse_loss(y, label)
 
             avg_task_loss.append(task_loss.item())
@@ -107,13 +105,14 @@ def train(args):
         # TensorBoard: エポックレベルでの記録
         writer.add_scalars('Loss/Train/Epoch/task_Losses', {'Task': epoch_task_loss}, epoch)
         writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
-        print(f"Epoch {epoch}, MSE_loss: {epoch_task_loss}")
+        print(f"Epoch {epoch}, loss: {epoch_task_loss}, task_loss: {epoch_task_loss}")
 
 
         # Test
         model.eval()
         with torch.no_grad():
             total_mae = 0.0  
+            total = 0
             for _, batch in enumerate(tqdm(valid_dataloader)):
                 audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask, label = batch
                 audio_x = audio_x.to(device)
@@ -132,7 +131,7 @@ def train(args):
                 mae = torch.abs(y - label).sum().item()
                 total_mae += mae
 
-        avg_mae = total_mae / len(valid_dataset)
+        avg_mae = total_mae / len(valid_dataloader)
         mae_lst.append(avg_mae)
 
         writer.add_scalar('MAE/Test', avg_mae, epoch)
