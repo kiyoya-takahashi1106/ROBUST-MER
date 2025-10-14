@@ -13,7 +13,7 @@ PATIENCE=5
 # 動的ログファイル名生成
 LOG_FILE="logs/prepretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
 
-python -u prepretrain.py \
+python -u prepretrain2.py \
     --seed $SEED \
     --lr $LR \
     --epochs $EPOCHS \
