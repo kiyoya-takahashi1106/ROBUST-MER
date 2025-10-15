@@ -103,7 +103,7 @@ def train(args):
         writer.add_scalars('Loss/Train/Epoch/Task_Losses', {
             'Task': epoch_loss,
         }, epoch)
-        writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
+        # writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
         print(f"Epoch {epoch}, loss: {epoch_loss})")
 
 
