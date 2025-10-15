@@ -5,6 +5,7 @@ DROPOUT_RATE=0.2
 EPOCHS=100
 BATCH_SIZE=100
 DATASET_NAME="CREMA-D"
+PREPRETRAINED_MODEL_FILE="MOSI"
 CLASS_NUM=6
 INPUT_MODALITY="video"
 PRETRAINED_MODEL_FILE="MOSI_epoch10_20251015_123734_1.2409_seed42.pth"
@@ -26,6 +27,7 @@ python -u pretrain.py \
     --epochs $EPOCHS \
     --batch_size $BATCH_SIZE \
     --dataset_name $DATASET_NAME \
+    --prepretrained_model_name $PREPRETRAINED_MODEL_FILE \
     --class_num $CLASS_NUM \
     --input_modality  $INPUT_MODALITY \
     --pretrained_model_file $PRETRAINED_MODEL_FILE \

@@ -32,6 +32,7 @@ def args():
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--batch_size", default=20, type=int)
     parser.add_argument("--dataset_name", default="CREMA-D", type=str)
+    parser.add_argument("--prepretrained_model_name", default="MOSI", type=str)
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
     parser.add_argument("--pretrained_model_file", default=".pth", type=str)
@@ -200,7 +201,7 @@ def train(args):
             patience_counter = 0
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/pretrain/{args.input_modality}/epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}.pth")
+                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_model_name}_epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}.pth")
             tqdm.write(f"We’ve saved the new model.")
         else:
             patience_counter += 1
