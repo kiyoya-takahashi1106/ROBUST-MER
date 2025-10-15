@@ -33,7 +33,7 @@ def args():
     parser.add_argument("--batch_size", default=20, type=int)
     parser.add_argument("--dataset_name", default="MOSI", type=str)
     parser.add_argument("--class_num", default=1, type=int)
-    parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
+    parser.add_argument("--input_modality", default="audio", type=str, help="audio or text or video")
     parser.add_argument("--hidden_dim", default=768, type=int)
     parser.add_argument("--patience", default=5, type=int, help="Early stopping patience")
     args = parser.parse_args()
