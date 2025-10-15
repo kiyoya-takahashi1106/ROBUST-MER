@@ -3,8 +3,10 @@ from pathlib import Path
 import shutil
 import kagglehub
 
-HANDLE = "reganw/cmu-mosi"
-DEST   = Path("/home/kiyoya/research/robust-mer/ROBUST-MER/data/MOSI/raw")
+HANDLE = "orvile/crema-d-emotional-multimodal-dataset"
+# HANDLE = "reganw/cmu-mosi"
+DEST   = Path("/home/kiyoya/research/robust-mer/ROBUST-MER/data/CREMA-D/raw")
+# DEST   = Path("/home/kiyoya/research/robust-mer/ROBUST-MER/data/MOSI/raw")
 
 # 1) まずKaggleHubのキャッシュにDL（成功すると展開先のパスが返る）
 src = Path(kagglehub.dataset_download(HANDLE))
