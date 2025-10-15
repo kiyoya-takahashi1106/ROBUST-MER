@@ -16,6 +16,8 @@ import os
 import numpy as np
 import argparse
 from tqdm import tqdm
+from datetime import datetime  # ← 追加
+date = datetime.now().strftime("%Y%m%d_%H%M%S")  # ← 追加
 
 from utils.utility import set_seed
 from utils.prepretrain_dataset2 import MOSIDataset
@@ -136,7 +138,7 @@ def train(args):
             
             os.makedirs("saved_models/prepretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{avg_mae:.4f}_seed{args.seed}.pth")
+                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{(date)}_{avg_mae:.4f}_seed{args.seed}.pth")
             print(f"We've saved the new model (MAE: {avg_mae:.4f})")
         else:
             patience_counter += 1

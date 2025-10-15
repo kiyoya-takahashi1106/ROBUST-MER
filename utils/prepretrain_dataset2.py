@@ -105,9 +105,10 @@ TARGET_LEN = 16000 * TARGET_SEC
 def fix_length_and_mask(wav_1d: torch.Tensor, target_len: int = TARGET_LEN):
     T = wav_1d.size(0)
     if T >= target_len:
-        # ✅ 均等にダウンサンプリング
-        indices = torch.linspace(0, T - 1, target_len).long()
-        wav_fixed = wav_1d[indices]
+        # ✅ 中央部分を取得
+        start_idx = (T - target_len) // 2
+        end_idx = start_idx + target_len
+        wav_fixed = wav_1d[start_idx:end_idx]
         attn_mask = torch.ones(target_len, dtype=torch.long)
     else:
         pad = target_len - T
