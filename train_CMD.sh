@@ -14,7 +14,7 @@ VIDEO_PRETRAINED_MODEL_FILE="epoch90_0.0413_0.7456_seed42.pth"
 # 動的ログファイル名生成
 LOG_FILE="logs/train/${DATASET_NAME}/$(date +%Y%m%d_%H%M%S).log"
 
-python -u train.py \
+python -u train_CMD.py \
     --seed $SEED \
     --lr $LR \
     --dropout_rate $DROPOUT_RATE \

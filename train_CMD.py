@@ -16,7 +16,7 @@ import argparse
 from tqdm import tqdm
 
 from utils.utility import set_seed
-from utils.train_dataset import MOSIDataset
+from utils.train_dataset_CMD import MOSIDataset
 
 print(torch.__version__)
 

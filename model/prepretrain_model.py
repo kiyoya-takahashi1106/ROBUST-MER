@@ -23,8 +23,20 @@ class PrepretrainModel(nn.Module):
                 if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
                     p.requires_grad = True
 
-        elif (input_modality == "text"  or  input_modality == "video"):
+        elif (input_modality == "text"):
             self.encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
+            for p in self.encoder.parameters():
+                p.requires_grad = False
+            L = self.encoder.config.num_hidden_layers
+            for n, p in self.encoder.named_parameters():
+                if any(f"encoder.layer.{i}." in n for i in [L - 2, L - 1]):
+                    p.requires_grad = True
+            for n, p in self.encoder.named_parameters():
+                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
+                    p.requires_grad = True
+
+        elif (input_modality == "video"):
+            self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
             for p in self.encoder.parameters():
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
