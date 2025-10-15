@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from transformers import WavLMModel, VideoMAEModel
-from peft import LoraConfig, get_peft_model
 
 
 class PretrainModel(nn.Module):
@@ -17,18 +16,9 @@ class PretrainModel(nn.Module):
         if (input_modality == "audio"):
             self.encoder_model = WavLMModel.from_pretrained("microsoft/wavlm-base")
             premodel_path = "./saved_models/prepretrain/audio/" + pretrained_model_file
+
         elif (input_modality == "video"):
             self.encoder_model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-            self.encoder_model.encoder.layer = self.encoder_model.encoder.layer[:8]
-            self.encoder_model.config.num_hidden_layers = 8 
-            lora_cfg = LoraConfig(
-                r=4,              
-                lora_alpha=8,   # r*2 base     
-                lora_dropout=0.1,
-                bias="none",
-                target_modules=["query","key","value","output.dense","attn.proj","qkv","proj"]
-            )
-            self.encoder_model = get_peft_model(self.encoder_model, lora_cfg)
             premodel_path = "./saved_models/prepretrain/video/" + pretrained_model_file
 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
@@ -38,8 +28,6 @@ class PretrainModel(nn.Module):
             param.requires_grad = False
         for param in self.layer_norm.parameters():
             param.requires_grad = False
-
-        self.dropout = nn.Dropout(0.3)
 
 
         # shared division encoder
@@ -128,9 +116,9 @@ class PretrainModel(nn.Module):
             if (self.input_modality == "audio"): 
                 f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
             elif (self.input_modality == "video"):
-                f = output_encoder_model.last_hidden_state[:, 0, :]
+                # f = output_encoder_model.last_hidden_state[:, 0, :]
+                f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
             f = self.layer_norm(f)
-        f = self.dropout(f)
 
         s = self.shared(f)
         p = private(f)

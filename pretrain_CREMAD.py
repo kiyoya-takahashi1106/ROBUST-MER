@@ -14,9 +14,11 @@ import os
 import numpy as np
 import argparse
 from tqdm import tqdm
+from datetime import datetime
+date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.pretrain_dataset import CREMADDataProvider, CREMADDataset
+from utils.pretrain_dataset_CREMAD import CREMADDataProvider, CREMADDataset
 from utils.function import SIMLOSS, DIFFLOSS, RECONLOSS
 
 print(torch.__version__)
@@ -198,7 +200,7 @@ def train(args):
             patience_counter = 0
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/pretrain/{args.input_modality}/epoch{epoch}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}.pth")
+                       f"saved_models/pretrain/{args.input_modality}/epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}.pth")
             tqdm.write(f"We’ve saved the new model.")
         else:
             patience_counter += 1

@@ -27,19 +27,14 @@ class Model(nn.Module):
         # テキスト
         self.text_encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
         self.text_encoder_layer_norm = nn.LayerNorm(self.hidden_dim)
+        self.load_pretrained_encoder_layer_weights(self.text_encoder, self.text_encoder_layer_norm, video_path)
+        for param in self.text_encoder.parameters():
+            param.requires_grad = False
+        for param in self.text_encoder_layer_norm.parameters():
+            param.requires_grad = False
 
         # 映像 (事前学習済み)
         self.video_encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-        self.video_encoder.encoder.layer = self.video_encoder.encoder.layer[:8]
-        self.video_encoder.config.num_hidden_layers = 8
-        lora_cfg = LoraConfig(
-            r=4,
-            lora_alpha=8,   # r*2 base
-            lora_dropout=0.1,
-            bias="none",
-            target_modules=["query","key","value","output.dense","attn.proj","qkv","proj"]
-        )
-        self.video_encoder = get_peft_model(self.video_encoder, lora_cfg)
         self.video_encoder_layer_norm = nn.LayerNorm((self.hidden_dim))
         self.load_pretrained_encoder_layer_weights(self.video_encoder, self.video_encoder_layer_norm, video_path)
         for param in self.video_encoder.parameters():

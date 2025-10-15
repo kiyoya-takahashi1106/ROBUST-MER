@@ -10,19 +10,18 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
 
-from model.prepretrain_model2 import PrepretrainModel
+from model.prepretrain_model import PrepretrainModel
 
 import os
 import numpy as np
 import argparse
 from tqdm import tqdm
-from datetime import datetime  # ← 追加
-date = datetime.now().strftime("%Y%m%d_%H%M%S")  # ← 追加
+from datetime import datetime
+date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.prepretrain_dataset2 import MOSIDataset
+from utils.prepretrain_dataset_CMD import MOSIDataset
 
-print(torch.__version__)
 
 
 def args():

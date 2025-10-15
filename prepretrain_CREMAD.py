@@ -14,9 +14,11 @@ import os
 import numpy as np
 import argparse
 from tqdm import tqdm
+from datetime import datetime
+date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.prepretrain_dataset import CREMADDataProvider, CREMADDataset
+from utils.prepretrain_dataset_CREMAD import CREMADDataProvider, CREMADDataset
 
 print(torch.__version__)
 
@@ -49,16 +51,19 @@ def train(args):
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
+
+    scaler = torch.amp.GradScaler('cuda')
+    optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
+
     data_provider = CREMADDataProvider()
     train_data, val_data = data_provider.get_dataset()
     train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
     val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
-
-    scaler = torch.amp.GradScaler('cuda')
-    optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
+    print("Train dataset size:", len(train_dataset))
+    print("Valid dataset size:", len(val_dataset))
     
     # モデル全体をGPUに移動
     model = model.to(device)
@@ -146,7 +151,7 @@ def train(args):
             
             os.makedirs("saved_models/prepretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{acc:.4f}_seed{args.seed}.pth")
+                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{date}_{acc:.4f}_seed{args.seed}.pth")
             print(f"We've saved the new model.")
         else:
             patience_counter += 1
