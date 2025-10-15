@@ -53,6 +53,9 @@ def train(args):
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
+    # Smooth L1 Loss
+    criterion = nn.SmoothL1Loss(beta=1.0)
+    
     scaler = torch.amp.GradScaler('cuda')
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
@@ -87,7 +90,7 @@ def train(args):
             y = model(x, attn_mask)
             y = y.squeeze(-1)
 
-            loss = F.mse_loss(y, label)
+            loss = criterion(y, label)
             avg_loss.append(loss.item())
 
             optimizer.zero_grad()
@@ -101,10 +104,10 @@ def train(args):
 
         # TensorBoard: エポックレベルでの記録
         writer.add_scalars('Loss/Train/Epoch/Task_Losses', {
-            'Task': epoch_loss,
+            'SmoothL1': epoch_loss,
         }, epoch)
         writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
-        print(f"Epoch {epoch}, MSE_loss: {epoch_loss}")
+        print(f"Epoch {epoch}, SmoothL1_loss: {epoch_loss}")
 
 
         # Validation

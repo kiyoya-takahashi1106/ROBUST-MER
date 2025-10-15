@@ -1,7 +1,7 @@
 import torch    
 from torch.utils.data import Dataset
 import torch.nn.functional as F
-from transformers import AutoFeatureExtractor, VideoMAEImageProcessor
+from transformers import AutoFeatureExtractor, RobertaTokenizer, VideoMAEImageProcessor
 from decord import VideoReader
 import torchaudio
 torchaudio.set_audio_backend("soundfile")
@@ -18,27 +18,32 @@ class MOSIDataset(Dataset):
         self.dataset = dataset
         self.split = split
         self.input_modality = input_modality    
+        self.filename_list = load_filename_list(dataset, split)
+
         if (self.input_modality == "audio"):
             self.processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
+        elif (self.input_modality == "text"):
+            self.processor = RobertaTokenizer.from_pretrained("roberta-base")
+            self.text, self.text_mask, self.label = load_text_data(dataset, split, self.processor, self.filename_list)
         elif (self.input_modality == "video"):
             self.processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
-        else:
-            raise ValueError(f"Unknown input_modality: {input_modality}")
         
-        self.filename_list = load_filename_list(dataset, split)
 
     def __len__(self):
         return len(self.filename_list)
 
     def __getitem__(self, index):
-        filename = self.filename_list[index]
-        x, x_mask, label = pre_process(
-            self.dataset, 
-            self.split, 
-            filename,
-            self.processor,
-            self.input_modality
-        )
+        if (self.input_modality == "text"):
+            return self.text[index], self.text_mask[index], self.label[index]
+        elif (self.input_modality == "audio") or (self.input_modality == "video"):
+            filename = self.filename_list[index]
+            x, x_mask, label = pre_process(
+                self.dataset, 
+                self.split, 
+                filename,
+                self.processor,
+                self.input_modality
+            )
         return x, x_mask, label
 
 
@@ -51,6 +56,61 @@ def load_filename_list(dataset, split):
         filename_list.append(filename)
     
     return filename_list
+
+
+
+def load_text_data(dataset, split, tokenizer, filename_list, max_length=64):
+    text_path = Path(f"data/{dataset}/segment/{split}/text")
+
+    # すべてのテキストを読み込む（1つのリストにまとめる）
+    all_texts = []
+    for filename in filename_list:
+        file_path = text_path / f"{filename}.txt"
+        with open(file_path, "r", encoding="utf-8") as f:
+            all_texts.append(f.read().strip())
+
+    # まとめてトークナイズ（attention_mask自動生成）
+    encoded = tokenizer(
+        all_texts,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=max_length
+    )
+
+    # data構造を元の関数に合わせて返す
+    # text_data は各要素が tokenizer 出力(dict型)
+    text_data = []
+    text_mask = []
+
+    for i in range(len(all_texts)):
+        item = {
+            'input_ids': encoded['input_ids'][i].unsqueeze(0),  # 形を(1, seq_len)に合わせる
+            'attention_mask': encoded['attention_mask'][i].unsqueeze(0)
+        }
+        text_data.append(item['input_ids'])
+        text_mask.append(item['attention_mask'])
+    
+    # ===== Label 取得（各ファイルごとにリストを作成） =====
+    df = pd.read_csv(Path(f"data/{dataset}/raw/label.csv"))
+    labels = []
+    for filename in filename_list:
+        parts = filename.rsplit('-', 1)
+        if len(parts) != 2:
+            raise ValueError(f"Unexpected filename format: {filename}")
+        video_id = parts[0]
+        try:
+            clip_id = int(parts[1])
+        except ValueError:
+            raise ValueError(f"Invalid clip id in filename: {filename}")
+
+        row = df[(df['video_id'] == video_id) & (df['clip_id'] == clip_id)]
+        if row.empty:
+            raise ValueError(f"Label not found for video_id={video_id}, clip_id={clip_id}")
+        lbl = float(row.iloc[0]['label'])
+        labels.append(torch.tensor(lbl, dtype=torch.float32))
+
+    return text_data, text_mask, labels
 
 
 
@@ -105,10 +165,9 @@ TARGET_LEN = 16000 * TARGET_SEC
 def fix_length_and_mask(wav_1d: torch.Tensor, target_len: int = TARGET_LEN):
     T = wav_1d.size(0)
     if T >= target_len:
-        # ✅ 中央部分を取得
-        start_idx = (T - target_len) // 2
-        end_idx = start_idx + target_len
-        wav_fixed = wav_1d[start_idx:end_idx]
+        # ✅ 均等にダウンサンプリング
+        indices = torch.linspace(0, T - 1, target_len).long()
+        wav_fixed = wav_1d[indices]
         attn_mask = torch.ones(target_len, dtype=torch.long)
     else:
         pad = target_len - T
