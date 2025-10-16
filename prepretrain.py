@@ -64,8 +64,8 @@ def train(args):
         train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
         val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
     elif (args.dataset_name == "MOSI"):
-        train_dataset = MOSIDataset(split="train", input_modality=args.input_modality, class_num=args.class_num)
-        val_dataset = MOSIDataset(split="valid", input_modality=args.input_modality, class_num=args.class_num)
+        train_dataset = MOSIDataset(dataset=args.dataset_name, split="train", input_modality=args.input_modality, class_num=args.class_num)
+        val_dataset = MOSIDataset(dataset=args.dataset_name, split="valid", input_modality=args.input_modality, class_num=args.class_num)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     print("Train dataset size:", len(train_dataset))
