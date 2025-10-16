@@ -17,6 +17,7 @@ class MOSIDataset(Dataset):
         self.dataset = dataset
         self.split = split
         self.class_num = class_num   # 2  or  7
+
         self.audio_processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
         self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
         self.video_processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
@@ -82,8 +83,8 @@ def load_text_data(dataset, split, tokenizer, filename_list, max_length=64):
 
     for i in range(len(all_texts)):
         item = {
-            'input_ids': encoded['input_ids'][i].unsqueeze(0),  # 形を(1, seq_len)に合わせる
-            'attention_mask': encoded['attention_mask'][i].unsqueeze(0)
+            'input_ids': encoded['input_ids'][i],  # 形を(1, seq_len)に合わせる
+            'attention_mask': encoded['attention_mask'][i]
         }
         text_data.append(item['input_ids'])
         text_mask.append(item['attention_mask'])
