@@ -2,10 +2,10 @@
 SEED=42
 LR=1e-4
 EPOCHS=50
-BATCH_SIZE=30
-DATASET_NAME="CREMA-D"
-CLASS_NUM=6
-INPUT_MODALITY="audio"
+BATCH_SIZE=20
+DATASET_NAME="MOSI"
+CLASS_NUM=1
+INPUT_MODALITY="video"
 HIDDEN_DIM=768
 PATIENCE=5
 
@@ -13,7 +13,7 @@ PATIENCE=5
 # 動的ログファイル名生成
 LOG_FILE="logs/prepretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
 
-python -u prepretrain.py \
+python -u prepretrain2.py \
     --seed $SEED \
     --lr $LR \
     --epochs $EPOCHS \

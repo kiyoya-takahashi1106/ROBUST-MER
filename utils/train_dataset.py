@@ -1,157 +1,128 @@
-# pretrain2.py {train, val} と同じ分け方
-
 import torch    
 from torch.utils.data import Dataset
 import torch.nn.functional as F
-
-from transformers import AutoFeatureExtractor, VideoMAEImageProcessor
+from transformers import AutoFeatureExtractor, AutoTokenizer, VideoMAEImageProcessor
 from decord import VideoReader
 import torchaudio
 torchaudio.set_audio_backend("soundfile")
 
+import os
+from pathlib import Path
 import pandas as pd
 import numpy as np
 
 
-class CREMADDataProvider:
-    def __init__(self):
-        self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification()
-        self.train_dataset = transform2prepre(self.train_sentence_emotion_group_dct)
-        self.val_dataset = transform2prepre(self.val_sentence_emotion_group_dct)
-
-    def get_dataset(self):
-        return self.train_dataset, self.val_dataset
-
-
-
-class CREMADDataset(Dataset):
-    def __init__(self, data):
-        self.data = data
+class MOSIDataset(Dataset):
+    def __init__(self, dataset, split):
+        self.dataset = dataset
+        self.split = split
         self.audio_processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
+        self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
         self.video_processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
+        self.filename_list = load_filename_list(dataset, split)
+        self.text, self.text_mask = load_text_data(dataset, split, self.tokenizer, self.filename_list)
 
     def __len__(self):
-        return len(self.data)
+        return len(self.filename_list)
 
     def __getitem__(self, index):
-        sample = self.data[index]
-        filename, label = sample
-        audio_x, audio_mask = pre_process(filename, "audio", self.audio_processor)
-        video_x, video_mask = pre_process(filename, "video", self.video_processor)
-        return audio_x, video_x, audio_mask, video_mask, label
+        filename = self.filename_list[index]
+        audio, video, audio_mask, video_mask, label = pre_process(
+            self.dataset, 
+            self.split, 
+            filename,
+            self.audio_processor,
+            self.video_processor
+        )
+        return audio, self.text[index], video, audio_mask, self.text_mask[index], video_mask, label
 
 
 
-# すべてのデータを (テキスト12 × 感情6) × grpoup4 に分類するし、それをtrainとvalに分割
-def cremed_classification():
-    # CSVファイルを読み込み
-    actors_file = pd.read_csv('./data/CREMA-D/raw/VideoDemographics.csv')
-    actors_file_content = actors_file.copy()
-    datas_file = pd.read_csv('./data/CREMA-D/raw/SentenceFilenames.csv')
-    datas_file_content = datas_file.copy()
-
-    # 各actorがgroupのどこに属するかを確認
-    actor_dct = {}
-    age_threshold = 40
-    for _, row in actors_file_content.iterrows():
-        actor_id = row["ActorID"]
-        age = row["Age"]
-        gender = row["Sex"]
-            
-        if age <= age_threshold:
-            if gender == 'Male':  
-                actor_dct[actor_id] = 1
-            else:  
-                actor_dct[actor_id] = 3
-        else: 
-            if gender == 'Male':
-                actor_dct[actor_id] = 2
-            else:
-                actor_dct[actor_id] = 4
-
-    sentence_emotion_group_dct = {}   # テキスト_感情_group -> datafile名のリスト
-    for _, row in datas_file_content.iterrows():
-        filename = row["Filename"]
-        part = filename.split('_')
-        actor_id = int(part[0])
-        sentence_emotion = part[1] + "_" + part[2]
-
-        if sentence_emotion not in sentence_emotion_group_dct:
-            sentence_emotion_group_dct[sentence_emotion] = {1: [], 2: [], 3: [], 4: []}
-        
-        actor_group = actor_dct[actor_id]
-        sentence_emotion_group_dct[sentence_emotion][actor_group].append(filename)
-
-    # train/val分割
-    train_sentence_emotion_group_dct = {}
-    val_sentence_emotion_group_dct = {}
+def load_filename_list(dataset, split):
+    folder_path = Path(f"data/{dataset}/segment/{split}/video")
+    filename_list = []
+    for file_path in sorted(folder_path.glob("*.flv")):
+        filename = file_path.stem
+        filename_list.append(filename)
     
-    for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
-        min_len = min(len(group_dct[1]), len(group_dct[2]), len(group_dct[3]), len(group_dct[4]))
-        train_sentence_emotion_group_dct[sentence_emotion] = {1: [], 2: [], 3: [], 4: []}
-        val_sentence_emotion_group_dct[sentence_emotion] = {1: [], 2: [], 3: [], 4: []}
-
-        for group_num in [1, 2, 3, 4]:
-            filename_lst = group_dct[group_num].copy()
-            
-            val_num = int(min_len * 0.2)
-            val_filename_lst = filename_lst[:val_num]
-            val_sentence_emotion_group_dct[sentence_emotion][group_num] = val_filename_lst
-
-            train_filename_lst = filename_lst[val_num:]
-            train_sentence_emotion_group_dct[sentence_emotion][group_num] = train_filename_lst
-
-    return train_sentence_emotion_group_dct, val_sentence_emotion_group_dct
+    return filename_list
 
 
 
-def transform2prepre(sentence_emotion_group_dct):
-    data = []
-    emotion_label_dct = {"ANG": 0, "DIS": 1, "FEA": 2, "HAP": 3, "NEU": 4, "SAD": 5}
+def load_text_data(dataset, split, tokenizer, filename_list, max_length=64):
+    text_path = Path(f"data/{dataset}/segment/{split}/text")
 
-    for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
-        emotion = sentence_emotion.split('_')[1]
-        label = emotion_label_dct[emotion]
-        for group_num in [1, 2, 3, 4]:
-            for i in range(len(group_dct[group_num])):
-                sample = [group_dct[group_num][i]]
-                sample = sample + [label]
-                data.append(sample)
+    # すべてのテキストを読み込む（1つのリストにまとめる）
+    all_texts = []
+    for filename in filename_list:
+        file_path = text_path / f"{filename}.txt"
+        with open(file_path, "r", encoding="utf-8") as f:
+            all_texts.append(f.read().strip())
 
-    return data
+    # まとめてトークナイズ（attention_mask自動生成）
+    encoded = tokenizer(
+        all_texts,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=max_length
+    )
+
+    # data構造を元の関数に合わせて返す
+    # text_data は各要素が tokenizer 出力(dict型)
+    text_data = []
+    text_mask = []
+
+    for i in range(len(all_texts)):
+        item = {
+            'input_ids': encoded['input_ids'][i].unsqueeze(0),  # 形を(1, seq_len)に合わせる
+            'attention_mask': encoded['attention_mask'][i].unsqueeze(0)
+        }
+        text_data.append(item['input_ids'])
+        text_mask.append(item['attention_mask'])
+
+    return text_data, text_mask
 
 
 
 # 指定されたファイルの各データに対して前処理を行いテンソルで返す
-def pre_process(filename, input_modality, processor):
-    parent_dir = "AudioWAV" if input_modality == "audio" else "VideoFlash"
-    file_path = f"data/CREMA-D/raw/{parent_dir}/{filename}"
+def pre_process(dataset, split, filename, audio_processor, video_processor):
+    segment_dir = Path(f"data/{dataset}/segment/{split}")
+    audio_path = segment_dir / "audio" / f"{filename}.wav"
+    video_path = segment_dir / "video" / f"{filename}.flv"
+    label_csv_path = Path(f"data/{dataset}/raw/label.csv")
+
+    # ===== 1. Audio 処理 =====
+    waveform, sr = torchaudio.load(audio_path)
+    if waveform.size(0) > 1:
+        waveform = waveform.mean(dim=0, keepdim=True)
+    if sr != 16000:
+        waveform = torchaudio.functional.resample(waveform, sr, 16000)
+    waveform, audio_mask = fix_length_and_mask(waveform.squeeze(0))
+    processor_output = audio_processor(waveform, sampling_rate=16000, return_tensors="pt")
+    audio = processor_output['input_values'].squeeze(0)
     
-    # モダリティ別処理
-    if (input_modality == "audio"):
-        file_path += ".wav"
-        waveform, sr = torchaudio.load(file_path)
-        if waveform.size(0) > 1:
-            waveform = waveform.mean(dim=0, keepdim=True)
-        if sr != 16000:
-            waveform = torchaudio.functional.resample(waveform, sr, 16000)
-        
-        waveform, attn_mask = fix_length_and_mask(waveform.squeeze(0))
+    # ===== 2. Video 処理 =====
+    vr = VideoReader(str(video_path))
+    T = 16
+    indices = np.linspace(0, len(vr) - 1, T).astype(int)
+    frames = [vr[i].asnumpy() for i in indices]
+    processor_output = video_processor(frames, return_tensors="pt")
+    video = processor_output['pixel_values'].squeeze(0)
+    video_mask = torch.ones((T,), dtype=torch.long)   # ★ None を避ける
 
-        processor_output = processor(waveform, sampling_rate=16000, return_tensors="pt")
-        result = processor_output['input_values'].squeeze(0)
+    # ===== 3. Label 取得 =====
+    df = pd.read_csv(label_csv_path)
+    parts = filename.rsplit('-', 1)
+    video_id = parts[0]
+    clip_id = int(parts[1])
+    
+    row = df[(df['video_id'] == video_id) & (df['clip_id'] == clip_id)]
+    label = float(row.iloc[0]['label'])
 
-    elif (input_modality == "video"):
-        file_path += ".flv"
-        vr = VideoReader(file_path)
-        T = 16
-        indices = np.linspace(0, len(vr) - 1, T).astype(int)
-        frames = [vr[i].asnumpy() for i in indices]
-        processor_output = processor(frames, return_tensors="pt")
-        result = processor_output['pixel_values'].squeeze(0)
-        attn_mask = torch.ones((T,), dtype=torch.long)   # ★ None を避ける
+    label = torch.tensor(label, dtype=torch.float32)
 
-    return result, attn_mask
+    return audio, video, audio_mask, video_mask, label
 
 
 
@@ -160,12 +131,14 @@ TARGET_SEC = 5
 TARGET_LEN = 16000 * TARGET_SEC  
 def fix_length_and_mask(wav_1d: torch.Tensor, target_len: int = TARGET_LEN):
     T = wav_1d.size(0)
-    if (T >= target_len):
-        wav_fixed = wav_1d[:target_len]
+    if T >= target_len:
+        # ✅ 均等にダウンサンプリング
+        indices = torch.linspace(0, T - 1, target_len).long()
+        wav_fixed = wav_1d[indices]
         attn_mask = torch.ones(target_len, dtype=torch.long)
     else:
         pad = target_len - T
-        wav_fixed = F.pad(wav_1d, (0, pad))   # 末尾ゼロ埋め
+        wav_fixed = F.pad(wav_1d, (0, pad))
         attn_mask = torch.cat([torch.ones(T, dtype=torch.long),
                               torch.zeros(pad, dtype=torch.long)], dim=0)
     return wav_fixed, attn_mask
