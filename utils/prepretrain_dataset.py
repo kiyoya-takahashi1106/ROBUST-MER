@@ -47,6 +47,7 @@ class MOSIDataset(Dataset):
                 label = torch.tensor(1) if label.item() >= 0 else torch.tensor(0)
             elif (self.class_num == 7):
                 # -3 ~ +3 実装中
+                pass
 
         return x, x_mask, label
 
