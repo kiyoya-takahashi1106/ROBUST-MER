@@ -19,7 +19,7 @@ date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
 from utils.pretrain_dataset import CREMADDataProvider, CREMADDataset
-from utils.function import SIMLOSS, DIFFLOSS, RECONLOSS
+from utils.function import SIMLOSS, DIFFLOSS, RECONLOSS, DISCRIMINATORLOSS
 
 print(torch.__version__)
 
@@ -41,6 +41,7 @@ def args():
     parser.add_argument("--weight_diff", default=1.0, type=float)
     parser.add_argument("--weight_recon", default=1.0, type=float)
     parser.add_argument("--weight_task", default=1.0, type=float)
+    parser.add_argument("--weight_discriminator", default=1.0, type=float)
     parser.add_argument("--patience", default=5, type=int, help="Early stopping patience")
     args = parser.parse_args()
     return args
@@ -75,6 +76,7 @@ def train(args):
     diff_loss_lst = []
     recon_loss_lst = []
     task_loss_lst = []
+    discriminator_loss_lst = []
     loss_lst = []
 
     for epoch in tqdm(range(args.epochs)):
@@ -83,6 +85,7 @@ def train(args):
         avg_diff_loss = []
         avg_recon_loss = []
         avg_task_loss = []
+        avg_discriminator_loss = []
         avg_loss = []
 
         # dataloaderの準備
@@ -107,20 +110,22 @@ def train(args):
             label = label.to(device)
 
             # モデルの順伝搬
-            y, f_lst, s_lst, p_lst, r_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
+            y, f_lst, s_lst, p_lst, r_lst, p_logits_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
 
             # 損失計算
             sim_loss = args.weight_sim * SIMLOSS(s_lst)
             diff_loss = args.weight_diff * DIFFLOSS(s_lst, p_lst)
             recon_loss = args.weight_recon * RECONLOSS(f_lst, r_lst)
             task_loss = args.weight_task * F.cross_entropy(y, label)
+            discriminator_loss = args.weight_discriminator * DISCRIMINATORLOSS(p_logits_lst)
 
-            loss = sim_loss + diff_loss + recon_loss + task_loss
+            loss = sim_loss + diff_loss + recon_loss + task_loss + discriminator_loss
 
             avg_sim_loss.append(sim_loss.item())
             avg_diff_loss.append(diff_loss.item())
             avg_recon_loss.append(recon_loss.item())
             avg_task_loss.append(task_loss.item())
+            avg_discriminator_loss.append(discriminator_loss.item())
             avg_loss.append(loss.item())
 
             optimizer.zero_grad()
@@ -133,12 +138,14 @@ def train(args):
         epoch_diff_loss = np.mean(avg_diff_loss)
         epoch_recon_loss = np.mean(avg_recon_loss)
         epoch_task_loss = np.mean(avg_task_loss)
+        epoch_discriminator_loss = np.mean(avg_discriminator_loss)
         epoch_loss = np.mean(avg_loss)
 
         sim_loss_lst.append(epoch_sim_loss)
         diff_loss_lst.append(epoch_diff_loss)
         recon_loss_lst.append(epoch_recon_loss)
         task_loss_lst.append(epoch_task_loss)
+        discriminator_loss_lst.append(epoch_discriminator_loss)
         epoch_avg_loss = epoch_loss
         loss_lst.append(epoch_avg_loss)
 
@@ -148,10 +155,11 @@ def train(args):
             'Difference': epoch_diff_loss,
             'Reconstruction': epoch_recon_loss,
             'Task': epoch_task_loss,
+            'Discriminator': epoch_discriminator_loss,
         }, epoch)
         writer.add_scalar('Loss/Train/Epoch/Total', epoch_loss, epoch)
-        writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
-        tqdm.write(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}")
+        # writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
+        tqdm.write(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}, discriminator_loss: {epoch_discriminator_loss}")
 
 
         # Test
@@ -173,7 +181,7 @@ def train(args):
                 attn_mask4 = attn_mask4.to(device)
                 label = label.to(device)
 
-                y, f_lst, s_lst, p_lst, r_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
+                y, f_lst, s_lst, p_lst, r_lst, p_logits_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
 
                 y = F.softmax(y, dim=1)
                 predictions = y.argmax(dim=1)
@@ -194,7 +202,7 @@ def train(args):
         acc_lst.append(acc)
 
         writer.add_scalar('Accuracy/Test', acc, epoch)
-        writer.add_scalar('Y_Max/Average', avg_y_max, epoch)  # TensorBoard に記録
+        writer.add_scalar('Y_Max/Average', avg_y_max, epoch)   # TensorBoard に記録
         tqdm.write(f"Epoch {epoch} Acc: {acc}")
 
         if (epoch == 0 or epoch_sim_loss <= min(sim_loss_lst)):

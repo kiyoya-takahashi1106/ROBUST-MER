@@ -14,20 +14,31 @@ def SIMLOSS(lst):
 
 
 
-def diffloss(input1, input2):
+def diffloss(input1, input2, eps: float = 1e-6, detach_norm: bool = False):
     batch_size = input1.size(0)
+    if batch_size == 0:
+        return input1.new_tensor(0.0)
+
     input1 = input1.view(batch_size, -1)
     input2 = input2.view(batch_size, -1)
 
-    # Zero mean
-    input1 = input1 - torch.mean(input1, dim=0, keepdims=True)
-    input2 = input2 - torch.mean(input2, dim=0, keepdims=True)
+    # Zero mean（列方向に対してバッチ平均を引く）
+    input1 = input1 - torch.mean(input1, dim=0, keepdim=True)
+    input2 = input2 - torch.mean(input2, dim=0, keepdim=True)
 
-    # L2正規化
-    input1_l2 = F.normalize(input1, p=2, dim=1)
-    input2_l2 = F.normalize(input2, p=2, dim=1)
+    # L2正規化（detach_norm=True ならノルムへの勾配を切る）
+    if detach_norm:
+        n1 = torch.norm(input1, p=2, dim=1, keepdim=True).detach()
+        n2 = torch.norm(input2, p=2, dim=1, keepdim=True).detach()
+        input1_l2 = input1.div(n1 + eps)
+        input2_l2 = input2.div(n2 + eps)
+    else:
+        input1_l2 = F.normalize(input1, p=2, dim=1, eps=eps)
+        input2_l2 = F.normalize(input2, p=2, dim=1, eps=eps)
 
-    diff_loss = torch.mean((input1_l2.t().mm(input2_l2)).pow(2))
+    # 相関行列の全要素の二乗平均を loss とする（計算量は特徴次元^2）
+    corr = input1_l2.t().mm(input2_l2)
+    diff_loss = torch.mean(corr.pow(2))
     return diff_loss
 
 
@@ -51,3 +62,12 @@ def RECONLOSS(f_lst, r_lst):
         loss += nn.MSELoss()(f_lst[i], r_lst[i])
     # return loss
     return loss / len(f_lst)
+
+
+def DISCRIMINATORLOSS(p_logits_lst):
+    loss = 0
+    for i, logits in enumerate(p_logits_lst):
+        batch_size = logits.size(0)
+        target = torch.full((batch_size,), i, device=logits.device, dtype=torch.long)
+        loss += F.cross_entropy(logits, target)
+    return loss / len(p_logits_lst)

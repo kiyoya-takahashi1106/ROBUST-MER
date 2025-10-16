@@ -56,7 +56,7 @@ def train(args):
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
 
-    data_provider = CREMADDataProvider()
+    data_provider = CREMADDataProvider(args.seed)
     train_data, val_data = data_provider.get_dataset()
     train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
     val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
