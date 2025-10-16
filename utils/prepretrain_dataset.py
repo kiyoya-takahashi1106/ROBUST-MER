@@ -33,7 +33,9 @@ class MOSIDataset(Dataset):
 
     def __getitem__(self, index):
         if (self.input_modality == "text"):
-            return self.text[index], self.text_mask[index], self.label[index]
+            x = self.text[index]
+            x_mask = self.text_mask[index]
+            label = self.label[index]
         elif (self.input_modality == "audio") or (self.input_modality == "video"):
             filename = self.filename_list[index]
             x, x_mask, label = pre_process(
@@ -43,11 +45,12 @@ class MOSIDataset(Dataset):
                 self.processor,
                 self.input_modality
             )
-            if (self.class_num == 2):
-                label = torch.tensor(1) if label.item() >= 0 else torch.tensor(0)
-            elif (self.class_num == 7):
-                # -3 ~ +3 実装中
-                pass
+
+        if (self.class_num == 2):
+            label = torch.tensor(1) if label.item() >= 0 else torch.tensor(0)
+        elif (self.class_num == 7):
+            # -3 ~ +3 実装中
+            pass
 
         return x, x_mask, label
 
