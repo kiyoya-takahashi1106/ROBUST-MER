@@ -1,5 +1,3 @@
-# pretrain2.py {train, val} と同じ分け方
-
 import torch    
 from torch.utils.data import Dataset
 import torch.nn.functional as F
@@ -99,16 +97,13 @@ def cremed_classification(seed):
 
         for group_num in [1, 2, 3, 4]:
             filename_lst = group_dct[group_num].copy()
+            rng.shuffle(filename_lst)
             
             val_num = int(min_len * 0.2)
             val_filename_lst = filename_lst[:val_num]
-            rng.shuffle(val_filename_lst)
             val_sentence_emotion_group_dct[sentence_emotion][group_num] = val_filename_lst
 
             train_filename_lst = filename_lst[val_num:]
-            random.shuffle(train_filename_lst)
-            if (len(train_filename_lst) > min_len-val_num):
-                train_filename_lst = train_filename_lst[:min_len-val_num]
             train_sentence_emotion_group_dct[sentence_emotion][group_num] = train_filename_lst
 
     return train_sentence_emotion_group_dct, val_sentence_emotion_group_dct
@@ -141,9 +136,9 @@ def pre_process(filename, input_modality, processor):
     if (input_modality == "audio"):
         file_path += ".wav"
         waveform, sr = torchaudio.load(file_path)
-        if waveform.size(0) > 1:
+        if (waveform.size(0) > 1):
             waveform = waveform.mean(dim=0, keepdim=True)
-        if sr != 16000:
+        if (sr != 16000):
             waveform = torchaudio.functional.resample(waveform, sr, 16000)
         
         waveform, attn_mask = fix_length_and_mask(waveform.squeeze(0))

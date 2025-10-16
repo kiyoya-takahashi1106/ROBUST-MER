@@ -1,5 +1,3 @@
-# MOSIでfinetuning
-
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -20,8 +18,10 @@ from datetime import datetime
 date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
+from utils.prepretrain_dataset_CREMA-D import CREMADDataProvider, CREMADDataset
 from utils.prepretrain_dataset import MOSIDataset
 
+print(torch.__version__)
 
 
 def args():
@@ -30,10 +30,11 @@ def args():
     parser.add_argument("--lr", default=1e-4, type=float)
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--batch_size", default=20, type=int)
-    parser.add_argument("--dataset_name", default="MOSI", type=str)
-    parser.add_argument("--class_num", default=1, type=int)
+    parser.add_argument("--dataset_name", default="CREMA-D", type=str)
+    parser.add_argument("--class_num", default=6, type=int, help="2 or 6 or 7")
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or text or video")
     parser.add_argument("--hidden_dim", default=768, type=int)
+    parser.add_argument("--dropout_rate", default=0.3, type=float)
     parser.add_argument("--patience", default=5, type=int, help="Early stopping patience")
     args = parser.parse_args()
     return args
@@ -45,35 +46,39 @@ def train(args):
         input_modality=args.input_modality, 
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
+        dropout_rate=args.dropout_rate
     )
     
     # TensorBoard Writer設定
-    log_dir = os.path.join("runs", "prepretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}")
+    log_dir = os.path.join("runs", "prepretrain", args.input_modality, f"{args.dataset_name}_classNum{args.class_num}_seed{args.seed}_dropout{args.dropout_rate}.pth")
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
-    # MSE Loss
-    criterion = nn.MSELoss()
-    
     scaler = torch.amp.GradScaler('cuda')
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
-    
-    train_dataset = MOSIDataset(split="train", dataset=args.dataset_name, input_modality=args.input_modality)
-    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-    valid_dataset = MOSIDataset(split="valid", dataset=args.dataset_name, input_modality=args.input_modality)
-    valid_dataloader = DataLoader(valid_dataset, batch_size=args.batch_size, shuffle=False)
-    print("Train dataset size:", len(train_dataset))
-    print("Valid dataset size:", len(valid_dataset))
 
+    if (args.dataset_name == "CREMA-D"):
+        data_provider = CREMADDataProvider(args.seed)
+        train_data, val_data = data_provider.get_dataset()
+        train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
+        val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
+    elif (args.dataset_name == "MOSI"):
+        train_dataset = MOSIDataset(split="train", input_modality=args.input_modality, class_num=args.class_num)
+        val_dataset = MOSIDataset(split="valid", input_modality=args.input_modality, class_num=args.class_num)
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+    print("Train dataset size:", len(train_dataset))
+    print("Valid dataset size:", len(val_dataset))
+    
     # モデル全体をGPUに移動
     model = model.to(device)
 
-    mae_lst = []
+    acc_lst = []
     loss_lst = []
     
     # Early Stopping用の変数
-    best_mae = float('inf')
+    best_acc = 0.0
     patience_counter = 0
 
     for epoch in tqdm(range(args.epochs)):
@@ -87,9 +92,8 @@ def train(args):
             label = label.to(device)
             
             y = model(x, attn_mask)
-            y = y.squeeze(-1)
 
-            loss = criterion(y, label)
+            loss = F.cross_entropy(y, label)
             avg_loss.append(loss.item())
 
             optimizer.zero_grad()
@@ -103,45 +107,58 @@ def train(args):
 
         # TensorBoard: エポックレベルでの記録
         writer.add_scalars('Loss/Train/Epoch/Task_Losses', {
-            'MSE': epoch_loss,
+            'Task': epoch_loss,
         }, epoch)
-        writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
-        print(f"Epoch {epoch}, MSE_loss: {epoch_loss}")
+        # writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
+        print(f"Epoch {epoch}, loss: {epoch_loss})")
 
 
         # Validation
         model.eval()
         with torch.no_grad():
-            total_mae = 0.0
-            
-            for batch in tqdm(valid_dataloader):
+            correct = 0
+            total = 0
+            y_max_values = []   # y の最大値を保存するリスト
+
+            for batch in tqdm(val_dataloader):
                 x, attn_mask, label = batch
                 x = x.to(device)
                 attn_mask = attn_mask.to(device)
                 label = label.to(device)
 
+                # モデルの順伝搬
                 y = model(x, attn_mask)
-                y = y.squeeze(-1)
 
-                # MAE を計算
-                mae = torch.abs(y - label).sum().item()
-                total_mae += mae
+                y = F.softmax(y, dim=1)
+                predictions = y.argmax(dim=1)
+                correct += (predictions == label).sum().item()
+                total   += label.size(0)
 
-        avg_mae = total_mae / len(valid_dataset)
-        mae_lst.append(avg_mae)
+                # y の各サンプルの最大値を取得
+                max_values = y.max(dim=1)[0]   # [batch_size] の Tensor
+                y_max_values.extend(max_values.cpu().tolist())
 
-        writer.add_scalar('MAE/Test', avg_mae, epoch)
-        print(f"Epoch {epoch} MAE: {avg_mae:.4f}")
+            print("correct, total:", correct, total)
+
+            # y の最大値の平均を計算
+            avg_y_max = np.mean(y_max_values)
+            print(f"Average of y max values: {avg_y_max:.4f}")
+
+        acc = correct / total
+        acc_lst.append(acc)
+
+        writer.add_scalar('Accuracy/Test', acc, epoch)
+        print(f"Epoch {epoch} Acc: {acc}")
 
         # Best model保存
-        if (avg_mae < best_mae):
-            best_mae = avg_mae
+        if (acc > best_acc):
+            best_acc = acc
             patience_counter = 0
             
             os.makedirs("saved_models/prepretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_epoch{epoch}_{(date)}_{avg_mae:.4f}_seed{args.seed}.pth")
-            print(f"We've saved the new model (MAE: {avg_mae:.4f})")
+                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_classNum{args.class_num}_epoch{epoch}_{date}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
+            print(f"We've saved the new model.")
         else:
             patience_counter += 1
             print(f"No improvement. Patience: {patience_counter}/{args.patience}")
@@ -153,17 +170,18 @@ def train(args):
         
         print("----------------------------------------------------------------------------")
 
-    print(f"Best MAE: {min(mae_lst):.4f}")
+    print("best acc: ", max(acc_lst))
 
     # 最終的な結果をTensorBoardに記録
     writer.add_hparams({
+        'input_modality': args.input_modality,
+        'dataset_name': args.dataset_name,
+        'class_num': args.class_num,
         'seed': args.seed,
         'epochs': args.epochs,
-        'batch_size': args.batch_size,
-        'dataset_name': args.dataset_name,
-        'input_modality': args.input_modality,
+        'dropout_rate': args.dropout_rate,
     }, {
-        'best_mae': min(mae_lst),
+        'best_accuracy': max(acc_lst),
     })
 
     writer.close()

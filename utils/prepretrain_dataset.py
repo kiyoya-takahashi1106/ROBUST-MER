@@ -12,12 +12,12 @@ import pandas as pd
 import numpy as np
 
 
-
 class MOSIDataset(Dataset):
-    def __init__(self, dataset, split, input_modality):
+    def __init__(self, dataset, split, input_modality, class_num):
         self.dataset = dataset
         self.split = split
-        self.input_modality = input_modality    
+        self.input_modality = input_modality
+        self.class_num = class_num   # 2  or  7
         self.filename_list = load_filename_list(dataset, split)
 
         if (self.input_modality == "audio"):
@@ -27,7 +27,6 @@ class MOSIDataset(Dataset):
             self.text, self.text_mask, self.label = load_text_data(dataset, split, self.processor, self.filename_list)
         elif (self.input_modality == "video"):
             self.processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
-        
 
     def __len__(self):
         return len(self.filename_list)
@@ -44,6 +43,11 @@ class MOSIDataset(Dataset):
                 self.processor,
                 self.input_modality
             )
+            if (self.class_num == 2):
+                label = torch.tensor(1) if label.item() >= 0 else torch.tensor(0)
+            elif (self.class_num == 7):
+                # -3 ~ +3 実装中
+
         return x, x_mask, label
 
 

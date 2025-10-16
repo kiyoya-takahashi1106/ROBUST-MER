@@ -5,7 +5,7 @@ from transformers import WavLMModel, RobertaModel, VideoMAEModel
 
 
 class PrepretrainModel(nn.Module):
-    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int):
+    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float):
         super(PrepretrainModel, self).__init__()
         self.input_modality = input_modality
         self.hidden_dim = hidden_dim
@@ -23,6 +23,7 @@ class PrepretrainModel(nn.Module):
                 if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
                     p.requires_grad = True
 
+        # dataset: CREMA-Dの時は使わない
         elif (input_modality == "text"):
             self.encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
             for p in self.encoder.parameters():
@@ -49,7 +50,7 @@ class PrepretrainModel(nn.Module):
 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
         self.gelu = nn.GELU()
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(dropout_rate)
         self.decoder = nn.Linear(self.hidden_dim, self.num_classes)
 
 
@@ -59,6 +60,7 @@ class PrepretrainModel(nn.Module):
             hidden = outputs.last_hidden_state
             f = hidden.mean(dim=1)
             
+        # dataset: CREMA-Dの時は使わない
         elif (self.input_modality == "text"):
             x = x.squeeze(1)
             attn_mask = attn_mask.squeeze(1)
@@ -70,7 +72,7 @@ class PrepretrainModel(nn.Module):
             outputs = self.encoder(x)
             hidden = outputs.last_hidden_state        
             f = hidden.mean(dim=1)
-         
+        
         f = self.layer_norm(f)
         f = self.gelu(f)
         f = self.dropout(f)

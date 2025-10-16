@@ -9,9 +9,7 @@ class PretrainModel(nn.Module):
 
         self.input_modality = input_modality
         self.hidden_dim = hidden_dim
-
         self.dropout_rate = dropout_rate
-        self.activation = nn.ReLU()
 
         if (input_modality == "audio"):
             self.encoder_model = WavLMModel.from_pretrained("microsoft/wavlm-base")
@@ -28,7 +26,6 @@ class PretrainModel(nn.Module):
             param.requires_grad = False
         for param in self.layer_norm.parameters():
             param.requires_grad = False
-
 
         # shared division encoder
         self.shared = nn.Sequential(
@@ -99,7 +96,7 @@ class PretrainModel(nn.Module):
         
         self.encoder_model.load_state_dict(encoder_weights, strict=False)
         self.layer_norm.load_state_dict(layer_norm_weights)
-        
+
 
     def one_forward(self, x, attn_mask, private, recon):
         with torch.no_grad():
@@ -108,7 +105,6 @@ class PretrainModel(nn.Module):
             if (self.input_modality == "audio"): 
                 f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
             elif (self.input_modality == "video"):
-                # f = output_encoder_model.last_hidden_state[:, 0, :]
                 f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
             f = self.layer_norm(f)
 
@@ -118,7 +114,6 @@ class PretrainModel(nn.Module):
         r = recon(sp)
 
         return f, s, p, r
-
 
 
     def forward(self, x1, x2, x3, x4, attn_mask1, attn_mask2, attn_mask3, attn_mask4):

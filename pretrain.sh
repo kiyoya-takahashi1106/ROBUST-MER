@@ -19,7 +19,7 @@ PATIENCE=5
 
 
 # 動的ログファイル名生成
-LOG_FILE="logs/pretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S).log"
+LOG_FILE="logs/pretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S)_${DROPOUT_RATE}.log"
 
 python -u pretrain.py \
     --seed $SEED \

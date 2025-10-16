@@ -14,8 +14,9 @@ import numpy as np
 
 
 class CREMADDataProvider:
-    def __init__(self):
-        self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification()
+    def __init__(self, seed):
+        self.seed = seed
+        self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification(seed)
         self.train_dataset = transform2prepre(self.train_sentence_emotion_group_dct)
         self.val_dataset = transform2prepre(self.val_sentence_emotion_group_dct)
 
@@ -43,7 +44,7 @@ class CREMADDataset(Dataset):
 
 
 # すべてのデータを (テキスト12 × 感情6) × grpoup4 に分類するし、それをtrainとvalに分割
-def cremed_classification():
+def cremed_classification(seed):
     # CSVファイルを読み込み
     actors_file = pd.read_csv('./data/CREMA-D/raw/VideoDemographics.csv')
     actors_file_content = actors_file.copy()
@@ -85,6 +86,7 @@ def cremed_classification():
     # train/val分割
     train_sentence_emotion_group_dct = {}
     val_sentence_emotion_group_dct = {}
+    rng = random.Random(seed)   # valの組み合わせは毎回同じ
     
     for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
         min_len = min(len(group_dct[1]), len(group_dct[2]), len(group_dct[3]), len(group_dct[4]))
@@ -93,6 +95,7 @@ def cremed_classification():
 
         for group_num in [1, 2, 3, 4]:
             filename_lst = group_dct[group_num].copy()
+            rng.shuffle(filename_lst)
             
             val_num = int(min_len * 0.2)
             val_filename_lst = filename_lst[:val_num]

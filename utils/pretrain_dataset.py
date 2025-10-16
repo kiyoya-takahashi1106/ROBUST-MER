@@ -34,9 +34,10 @@ train_dataset = [
 
 
 class CREMADDataProvider:
-    def __init__(self, seed):
+    def __init__(self, seed, epoch):
         self.seed = seed
-        self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification(seed)
+        self.epoch = epoch
+        self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification(seed, epoch)
         self.train_dataset = make_data_combination(self.train_sentence_emotion_group_dct)
         self.val_dataset = make_data_combination(self.val_sentence_emotion_group_dct)   
 
@@ -70,7 +71,7 @@ class CREMADDataset(Dataset):
 
 
 # すべてのデータを (テキスト12 × 感情6) × grpoup4 に分類するし、それをtrainとvalに分割
-def cremed_classification(seed):
+def cremed_classification(seed, epoch):
     # CSVファイルを読み込み
     actors_file = pd.read_csv('./data/CREMA-D/raw/VideoDemographics.csv')
     actors_file_content = actors_file.copy()
@@ -113,6 +114,7 @@ def cremed_classification(seed):
     train_sentence_emotion_group_dct = {}
     val_sentence_emotion_group_dct = {}
     rng = random.Random(seed)   # valの組み合わせは毎回同じ
+    epoch_rng = random.Random(seed + epoch)   # epochごとにtrainの組み合わせを変える
     
     for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
         min_len = min(len(group_dct[1]), len(group_dct[2]), len(group_dct[3]), len(group_dct[4]))
@@ -121,14 +123,14 @@ def cremed_classification(seed):
 
         for group_num in [1, 2, 3, 4]:
             filename_lst = group_dct[group_num].copy()
+            rng.shuffle(filename_lst)
             
             val_num = int(min_len * 0.2)
             val_filename_lst = filename_lst[:val_num]
-            rng.shuffle(val_filename_lst)
             val_sentence_emotion_group_dct[sentence_emotion][group_num] = val_filename_lst
 
             train_filename_lst = filename_lst[val_num:]
-            random.shuffle(train_filename_lst)
+            epoch_rng.shuffle(train_filename_lst)
             if (len(train_filename_lst) > min_len-val_num):
                 train_filename_lst = train_filename_lst[:min_len-val_num]
             train_sentence_emotion_group_dct[sentence_emotion][group_num] = train_filename_lst

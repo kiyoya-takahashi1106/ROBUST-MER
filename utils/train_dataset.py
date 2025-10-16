@@ -13,9 +13,10 @@ import numpy as np
 
 
 class MOSIDataset(Dataset):
-    def __init__(self, dataset, split):
+    def __init__(self, dataset, split, class_num):
         self.dataset = dataset
         self.split = split
+        self.class_num = class_num   # 2  or  7
         self.audio_processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
         self.tokenizer = AutoTokenizer.from_pretrained("roberta-base")
         self.video_processor = VideoMAEImageProcessor.from_pretrained("MCG-NJU/videomae-base")
@@ -34,6 +35,11 @@ class MOSIDataset(Dataset):
             self.audio_processor,
             self.video_processor
         )
+        if (self.class_num == 2):
+            label = torch.tensor(1) if label.item() >= 0 else torch.tensor(0)
+        elif (self.class_num == 7):
+            # -3 ~ +3 実装中
+
         return audio, self.text[index], video, audio_mask, self.text_mask[index], video_mask, label
 
 
@@ -131,10 +137,8 @@ TARGET_SEC = 5
 TARGET_LEN = 16000 * TARGET_SEC  
 def fix_length_and_mask(wav_1d: torch.Tensor, target_len: int = TARGET_LEN):
     T = wav_1d.size(0)
-    if T >= target_len:
-        # ✅ 均等にダウンサンプリング
-        indices = torch.linspace(0, T - 1, target_len).long()
-        wav_fixed = wav_1d[indices]
+    if (T >= target_len):
+        wav_fixed = wav_1d[:target_len]
         attn_mask = torch.ones(target_len, dtype=torch.long)
     else:
         pad = target_len - T

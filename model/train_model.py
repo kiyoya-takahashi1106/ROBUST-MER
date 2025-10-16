@@ -5,13 +5,15 @@ from peft import LoraConfig, get_peft_model
 
 
 class Model(nn.Module):
-    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, audio_pretrained_model_file: str, video_pretrained_model_file: str):
+    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, dataset_name: str, audio_pretrained_model_file: str, text_pretrained_model_file: str, video_pretrained_model_file: str):
         super(Model, self).__init__()
         self.hidden_dim = hidden_dim
 
         self.dropout_rate = dropout_rate
+        self.dataset_name = dataset_name
 
         audio_path = "./saved_models/pretrain/audio/" + audio_pretrained_model_file
+        text_path = "./saved_models/pretrain/text/" + text_pretrained_model_file
         video_path = "./saved_models/pretrain/video/" + video_pretrained_model_file
         
         # Encoder + LN
@@ -69,13 +71,20 @@ class Model(nn.Module):
 
 
         # fusion
-        transformer_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=12)
-        self.transformer_encoder = nn.TransformerEncoder(transformer_layer, num_layers=1)
-        self.fusion = nn.Sequential(
-            nn.Linear(self.hidden_dim*3, self.hidden_dim),
-            nn.LayerNorm(self.hidden_dim),
-            nn.GELU(),
-        )
+        if (self.dataset_name == "CREMA-D"):
+            self.fusion = nn.Sequential(
+                nn.Linear(self.hidden_dim*2, self.hidden_dim),
+                nn.LayerNorm(self.hidden_dim),
+                nn.GELU(),
+            )
+        elif (self.dataset_name == "MOSI"):
+            transformer_layer = nn.TransformerEncoderLayer(d_model=self.hidden_dim, nhead=12)
+            self.transformer_encoder = nn.TransformerEncoder(transformer_layer, num_layers=1)
+            self.fusion = nn.Sequential(
+                nn.Linear(self.hidden_dim*3, self.hidden_dim),
+                nn.LayerNorm(self.hidden_dim),
+                nn.GELU(),
+            )
 
         # decoder
         self.decoder = nn.Linear(self.hidden_dim, num_classes)
@@ -152,12 +161,12 @@ class Model(nn.Module):
                 f = shared_layer_norm(f)
         elif (modality == "text"):
             encoder_output = encoder(x, attention_mask=attn_mask)
-            f = encoder_output.last_hidden_state[:, 0, :]  # CLSトークン
+            f = encoder_output.last_hidden_state[:, 0, :]   # CLSトークン
             f = encoder_layer_norm(f)
         elif (modality == "video"):
             with torch.no_grad():
                 encoder_output = encoder(x, attention_mask=attn_mask)
-                f = encoder_output.last_hidden_state[:, 0, :]
+                f = encoder_output.last_hidden_state[:, 1:, :].mean(1)
                 f = encoder_layer_norm(f)
                 f = linear(f)
                 f = shared_layer_norm(f)
@@ -183,12 +192,16 @@ class Model(nn.Module):
         text_divided_f = self.one_forward("text", text_x, self.text_encoder, text_attn_mask, self.text_encoder_layer_norm, None, None, self.text_shared_dropout)
         video_divided_f = self.one_forward("video", video_x, self.video_encoder, video_attn_mask, self.video_encoder_layer_norm, self.video_shared, self.video_shared_layer_norm, self.video_shared_dropout)
 
-        fusion_f = torch.stack((audio_divided_f, text_divided_f, video_divided_f), dim=0)
-        fusion_f = self.transformer_encoder(fusion_f)
+        if (self.dataset_name == "CREMA-D"):
+            fusion_f = torch.cat((audio_divided_f, video_divided_f), dim=1)
+            fusion_f = self.fusion(fusion_f)
+        elif (self.dataset_name == "MOSI"):
+            fusion_f = torch.stack((audio_divided_f, text_divided_f, video_divided_f), dim=0)
+            fusion_f = self.transformer_encoder(fusion_f)
 
-        fusion_f = torch.cat((fusion_f[0], fusion_f[1], fusion_f[2]), dim=1)
-        fusion_f = self.fusion(fusion_f)
+            fusion_f = torch.cat((fusion_f[0], fusion_f[1], fusion_f[2]), dim=1)
+            fusion_f = self.fusion(fusion_f)
 
         y = self.decoder(fusion_f)
-        y = y.squeeze(-1)
+
         return y 

@@ -64,6 +64,7 @@ def RECONLOSS(f_lst, r_lst):
     return loss / len(f_lst)
 
 
+
 def DISCRIMINATORLOSS(p_logits_lst):
     loss = 0
     for i, logits in enumerate(p_logits_lst):

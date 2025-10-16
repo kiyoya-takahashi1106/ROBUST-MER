@@ -58,7 +58,7 @@ def train(args):
     )
     
     # TensorBoard Writer設定
-    log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}")
+    log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}_dropout{args.dropout_rate}")
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
@@ -89,7 +89,7 @@ def train(args):
         avg_loss = []
 
         # dataloaderの準備
-        data_provider = CREMADDataProvider(seed=args.seed)
+        data_provider = CREMADDataProvider(seed=args.seed, epoch=epoch)
         train_data, val_data = data_provider.get_dataset()
         train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
         val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
@@ -146,8 +146,7 @@ def train(args):
         recon_loss_lst.append(epoch_recon_loss)
         task_loss_lst.append(epoch_task_loss)
         discriminator_loss_lst.append(epoch_discriminator_loss)
-        epoch_avg_loss = epoch_loss
-        loss_lst.append(epoch_avg_loss)
+        loss_lst.append(epoch_loss)
 
         # TensorBoard: エポックレベルでの記録
         writer.add_scalars('Loss/Train/Epoch/individual_Losses', {
@@ -159,7 +158,7 @@ def train(args):
         }, epoch)
         writer.add_scalar('Loss/Train/Epoch/Total', epoch_loss, epoch)
         # writer.add_scalar('Learning_Rate', scheduler.get_last_lr()[0], epoch)
-        tqdm.write(f"Epoch {epoch}, loss: {epoch_avg_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}, discriminator_loss: {epoch_discriminator_loss}")
+        tqdm.write(f"Epoch {epoch}, loss: {epoch_loss}, sim_loss: {epoch_sim_loss}, diff_loss: {epoch_diff_loss}, recon_loss: {epoch_recon_loss}, task_loss: {epoch_task_loss}, discriminator_loss: {epoch_discriminator_loss}")
 
 
         # Test
@@ -202,14 +201,14 @@ def train(args):
         acc_lst.append(acc)
 
         writer.add_scalar('Accuracy/Test', acc, epoch)
-        writer.add_scalar('Y_Max/Average', avg_y_max, epoch)   # TensorBoard に記録
+        writer.add_scalar('Y_Max/Average', avg_y_max, epoch)
         tqdm.write(f"Epoch {epoch} Acc: {acc}")
 
         if (epoch == 0 or epoch_sim_loss <= min(sim_loss_lst)):
             patience_counter = 0
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_model_name}_epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}.pth")
+                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_model_name}_epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
             tqdm.write(f"We’ve saved the new model.")
         else:
             patience_counter += 1
