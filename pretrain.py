@@ -204,7 +204,7 @@ def train(args):
         writer.add_scalar('Y_Max/Average', avg_y_max, epoch)
         tqdm.write(f"Epoch {epoch} Acc: {acc}")
 
-        if (epoch == 0 or epoch_sim_loss <= min(sim_loss_lst)):
+        if (epoch == 0 or acc >= max(acc_lst[:-1])):
             patience_counter = 0
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
