@@ -12,20 +12,23 @@ class PretrainModel(nn.Module):
         self.dropout_rate = dropout_rate
 
         if (input_modality == "audio"):
-            self.encoder_model = WavLMModel.from_pretrained("microsoft/wavlm-base")
+            self.encoder = WavLMModel.from_pretrained("microsoft/wavlm-base")
             premodel_path = "./saved_models/prepretrain/audio/" + pretrained_model_file
 
         elif (input_modality == "video"):
-            self.encoder_model = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
+            self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
             premodel_path = "./saved_models/prepretrain/video/" + pretrained_model_file
 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
 
         self.load_pretrained_layer_weights(premodel_path)
-        for param in self.encoder_model.parameters():
+        for param in self.encoder.parameters():
             param.requires_grad = False
         for param in self.layer_norm.parameters():
             param.requires_grad = False
+
+        self.check_pretrained_loaded(self.encoder, premodel_path, prefix="encoder.")
+        self.check_pretrained_loaded(self.layer_norm, premodel_path, prefix="layer_norm.")
 
         # shared division encoder
         self.shared = nn.Sequential(
@@ -87,20 +90,34 @@ class PretrainModel(nn.Module):
         layer_norm_weights = {}
         
         for key, value in state_dict.items():
-            if key.startswith("encoder_model."):
-                new_key = key.replace("encoder_model.", "")
+            if key.startswith("encoder."):
+                new_key = key.replace("encoder.", "", 1)
                 encoder_weights[new_key] = value
-            elif key.startswith("layer_norm."):
+            if key.startswith("layer_norm."):
                 new_key = key.replace("layer_norm.", "")
                 layer_norm_weights[new_key] = value
-        
-        self.encoder_model.load_state_dict(encoder_weights, strict=False)
+
+        self.encoder.load_state_dict(encoder_weights, strict=False)
         self.layer_norm.load_state_dict(layer_norm_weights)
+
+
+    def check_pretrained_loaded(self, model, path, prefix):
+        ckpt = torch.load(path, map_location="cpu")
+        sd = ckpt.get("model_state_dict") or ckpt.get("state_dict") or ckpt
+        sd_keys = [k for k in sd.keys() if k.startswith(prefix)]
+
+        model_keys = [k for k in model.state_dict().keys()]
+        matched = [k for k in sd_keys if k.replace(prefix, "", 1) in model_keys]
+        print(f"Found {len(matched)} / {len(sd_keys)} matching keys for {prefix}")
+        if len(matched) > 0:
+            print("✅ Loaded successfully (keys matched)")
+        else:
+            print("❌ No matching keys — checkpoint not loaded")
 
 
     def one_forward(self, x, attn_mask, private, recon):
         with torch.no_grad():
-            output_encoder_model = self.encoder_model(x, attention_mask=attn_mask)
+            output_encoder_model = self.encoder(x, attention_mask=attn_mask)
 
             if (self.input_modality == "audio"): 
                 f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
