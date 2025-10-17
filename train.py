@@ -14,6 +14,8 @@ import os
 import numpy as np
 import argparse
 from tqdm import tqdm
+from datetime import datetime
+date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
 from utils.train_dataset_CREMAD import CREMADDataProvider, CREMADDataset
@@ -154,7 +156,7 @@ def train(args):
         if (accuracy >= best_acc):
             best_acc = accuracy
             os.makedirs("saved_models/train/", exist_ok=True)
-            torch.save(model.state_dict(), f"saved_models/train/{args.dataset_name}_classNum{args.class_num}_epoch{epoch}_{accuracy:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
+            torch.save(model.state_dict(), f"saved_models/train/{args.dataset_name}_classNum{args.class_num}_{date}_epoch{epoch}_{accuracy:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
             print(f"We've saved the new model (Accuracy: {accuracy:.4f})")
         print("----------------------------------------------------------------------------")
 

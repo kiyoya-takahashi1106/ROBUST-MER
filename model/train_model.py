@@ -14,7 +14,7 @@ class Model(nn.Module):
 
         audio_path = "./saved_models/pretrain/audio/" + audio_pretrained_model_file
         text_path = "./saved_models/prepretrain/text/" + text_pretrained_model_file
-        video_path = "./saved_models/pretrain/video/" + video_pretrained_model_file
+        video_path = "./saved_models/prepretrain/video/" + video_pretrained_model_file
 
         # Encoder + LN
         # 音声 (事前学習済み)
@@ -81,8 +81,8 @@ class Model(nn.Module):
             param.requires_grad = False
         self.video_shared_dropout = nn.Dropout(self.dropout_rate)
 
-        self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
-        self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
+        # self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
+        # self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
 
 
         # fusion
@@ -193,8 +193,8 @@ class Model(nn.Module):
                 encoder_output = encoder(x, attention_mask=attn_mask)
                 f = encoder_output.last_hidden_state[:, 1:, :].mean(1)
                 f = encoder_layer_norm(f)
-                f = linear(f)
-                f = shared_layer_norm(f)
+                # f = linear(f)
+                # f = shared_layer_norm(f)
 
         f = dropout(f)
 

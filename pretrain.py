@@ -55,7 +55,9 @@ def train(args):
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
         dropout_rate=args.dropout_rate,
-        pretrained_model_file=args.pretrained_model_file
+        pretrained_model_file=args.pretrained_model_file,
+        prepretrained_dataset=args.prepretrained_dataset,
+        prepretrained_classnum=args.prepretrained_classnum
     )
     
     # TensorBoard Writer設定
@@ -90,7 +92,7 @@ def train(args):
         avg_loss = []
 
         # dataloaderの準備
-        data_provider = CREMADDataProvider(seed=args.seed, epoch=epoch)
+        data_provider = CREMADDataProvider(seed=args.seed, epoch=epoch, prepretrained_dataset=args.prepretrained_dataset, prepretrained_classnum=args.prepretrained_classnum)
         train_data, val_data = data_provider.get_dataset()
         train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
         val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
@@ -209,7 +211,7 @@ def train(args):
             patience_counter = 0
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_dataset}_classNum{args.prepretrained_classnum}_epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
+                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_dataset}_classNum{args.prepretrained_classnum}_{date}_epoch{epoch}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
             tqdm.write(f"We’ve saved the new model.")
         else:
             patience_counter += 1

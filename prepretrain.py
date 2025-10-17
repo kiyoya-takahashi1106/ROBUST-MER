@@ -157,7 +157,7 @@ def train(args):
             
             os.makedirs("saved_models/prepretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_classNum{args.class_num}_epoch{epoch}_{date}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
+                       f"saved_models/prepretrain/{args.input_modality}/{args.dataset_name}_classNum{args.class_num}_{date}_epoch{epoch}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
             print(f"We've saved the new model.")
         else:
             patience_counter += 1
