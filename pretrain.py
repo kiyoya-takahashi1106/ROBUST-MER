@@ -32,7 +32,8 @@ def args():
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--batch_size", default=20, type=int)
     parser.add_argument("--dataset_name", default="CREMA-D", type=str)
-    parser.add_argument("--prepretrained_model_name", default="MOSI", type=str)
+    parser.add_argument("--prepretrained_dataset", default="MOSI", type=str)
+    parser.add_argument("--prepretrained_classnum", default=2, type=int)
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--input_modality", default="audio", type=str, help="audio or video")
     parser.add_argument("--pretrained_model_file", default=".pth", type=str)
@@ -58,7 +59,7 @@ def train(args):
     )
     
     # TensorBoard Writer設定
-    log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.dataset_name}_seed{args.seed}_dropout{args.dropout_rate}")
+    log_dir = os.path.join("runs", "pretrain", args.input_modality, f"{args.prepretrained_dataset}_{args.prepretrained_classnum}_seed{args.seed}_dropout{args.dropout_rate}")
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
@@ -208,7 +209,7 @@ def train(args):
             patience_counter = 0
             os.makedirs("saved_models/pretrain/" + args.input_modality, exist_ok=True)
             torch.save(model.state_dict(),
-                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_model_name}_epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
+                       f"saved_models/pretrain/{args.input_modality}/{args.prepretrained_dataset}_classNum{args.prepretrained_classnum}_epoch{epoch}_{date}_{epoch_sim_loss:.4f}_{acc:.4f}_seed{args.seed}_dropout{args.dropout_rate}.pth")
             tqdm.write(f"We’ve saved the new model.")
         else:
             patience_counter += 1

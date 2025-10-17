@@ -5,7 +5,8 @@ DROPOUT_RATE=0.3
 EPOCHS=100
 BATCH_SIZE=100
 DATASET_NAME="CREMA-D"
-PREPRETRAINED_MODEL_FILE="MOSI"
+PREPRETRAINED_DATASET="MOSI"
+PREPRETRAINED_CLASSNUM=2
 CLASS_NUM=6
 INPUT_MODALITY="video"
 PRETRAINED_MODEL_FILE="MOSI_classNum2_epoch10_20251016_134922_0.6594_seed42_dropout0.3.pth"
@@ -19,7 +20,7 @@ PATIENCE=5
 
 
 # 動的ログファイル名生成
-LOG_FILE="logs/pretrain/${INPUT_MODALITY}/${DATASET_NAME}_$(date +%Y%m%d_%H%M%S)_${DROPOUT_RATE}.log"
+LOG_FILE="logs/pretrain/${INPUT_MODALITY}/${PREPRETRAINED_DATASET}_${PREPRETRAINED_CLASSNUM}_$(date +%Y%m%d_%H%M%S)_${DROPOUT_RATE}.log"
 
 python -u pretrain.py \
     --seed $SEED \
@@ -28,7 +29,8 @@ python -u pretrain.py \
     --epochs $EPOCHS \
     --batch_size $BATCH_SIZE \
     --dataset_name $DATASET_NAME \
-    --prepretrained_model_name $PREPRETRAINED_MODEL_FILE \
+    --prepretrained_dataset $PREPRETRAINED_DATASET \
+    --prepretrained_classnum $PREPRETRAINED_CLASSNUM \
     --class_num $CLASS_NUM \
     --input_modality  $INPUT_MODALITY \
     --pretrained_model_file $PRETRAINED_MODEL_FILE \
