@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+from torch.cuda.amp import autocast, GradScaler
 
 from model.pretrain_model import PretrainModel
 
@@ -65,7 +66,7 @@ def train(args):
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
-    scaler = torch.amp.GradScaler('cuda')
+    scaler = GradScaler()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
     
@@ -112,15 +113,13 @@ def train(args):
             attn_mask4 = attn_mask4.to(device)
             label = label.to(device)
 
-            # モデルの順伝搬
-            y, f_lst, s_lst, p_lst, r_lst, p_logits_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
-
-            # 損失計算
-            sim_loss = args.weight_sim * SIMLOSS(s_lst)
-            diff_loss = args.weight_diff * DIFFLOSS(s_lst, p_lst)
-            recon_loss = args.weight_recon * RECONLOSS(f_lst, r_lst)
-            task_loss = args.weight_task * F.cross_entropy(y, label)
-            discriminator_loss = args.weight_discriminator * DISCRIMINATORLOSS(p_logits_lst)
+            with autocast():
+                y, f_lst, s_lst, p_lst, r_lst, p_logits_lst = model(group1, group2, group3, group4, attn_mask1, attn_mask2, attn_mask3, attn_mask4)
+                sim_loss = args.weight_sim * SIMLOSS(s_lst)
+                diff_loss = args.weight_diff * DIFFLOSS(s_lst, p_lst)
+                recon_loss = args.weight_recon * RECONLOSS(f_lst, r_lst)
+                task_loss = args.weight_task * F.cross_entropy(y, label)
+                discriminator_loss = args.weight_discriminator * DISCRIMINATORLOSS(p_logits_lst)
 
             loss = sim_loss + diff_loss + recon_loss + task_loss + discriminator_loss
 

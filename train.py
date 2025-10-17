@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import DataLoader
+from torch.cuda.amp import autocast, GradScaler
 
 from model.train_model import Model
 
@@ -58,7 +59,7 @@ def train(args):
     writer = SummaryWriter(log_dir=log_dir)
     print(f"TensorBoard logs will be saved to: {log_dir}")
 
-    scaler = torch.amp.GradScaler('cuda')
+    scaler = GradScaler()
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
 
@@ -100,9 +101,9 @@ def train(args):
             video_attn_mask = video_attn_mask.to(device)
             label = label.to(device)
 
-            logits = model(audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask)
-
-            task_loss = F.cross_entropy(logits, label)
+            with autocast():
+                logits = model(audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask)
+                task_loss = F.cross_entropy(logits, label)
 
             avg_task_loss.append(task_loss.item())
 
