@@ -34,12 +34,14 @@ train_dataset = [
 
 
 class CREMADDataProvider:
-    def __init__(self, seed, epoch):
+    def __init__(self, seed, epoch, prepretrained_dataset, prepretrained_classnum):
         self.seed = seed
         self.epoch = epoch
+        self.prepretrained_dataset = prepretrained_dataset
+        self.prepretrained_classnum = prepretrained_classnum
         self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification(seed, epoch)
-        self.train_dataset = make_data_combination(self.train_sentence_emotion_group_dct)
-        self.val_dataset = make_data_combination(self.val_sentence_emotion_group_dct)   
+        self.train_dataset = make_data_combination(self.train_sentence_emotion_group_dct, self.prepretrained_dataset, self.prepretrained_classnum)
+        self.val_dataset = make_data_combination(self.val_sentence_emotion_group_dct, self.prepretrained_dataset, self.prepretrained_classnum)
 
     def get_dataset(self):
         return self.train_dataset, self.val_dataset
@@ -140,12 +142,18 @@ def cremed_classification(seed, epoch):
 
 
 #  train/valデータを作成 (要素はfilename)
-def make_data_combination(sentence_emotion_group_dct):
+def make_data_combination(sentence_emotion_group_dct, prepretrained_dataset, prepretrained_classnum):
     data = []
-    emotion_label_dct = {"ANG": 0, "DIS": 1, "FEA": 2, "HAP": 3, "NEU": 4, "SAD": 5}
+    if (prepretrained_dataset == "MOSI" and prepretrained_classnum == 2):
+        emotion_label_dct = {"ANG": 0, "HAP": 1}
+    else:
+        emotion_label_dct = {"ANG": 0, "DIS": 1, "FEA": 2, "HAP": 3, "NEU": 4, "SAD": 5}
 
     for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
         emotion = sentence_emotion.split('_')[1]
+        if (prepretrained_dataset == "MOSI" and prepretrained_classnum == 2):
+            if (emotion not in ["ANG", "HAP"]):
+                continue
         label = emotion_label_dct[emotion]
 
         for i in range(len(group_dct[1])):
