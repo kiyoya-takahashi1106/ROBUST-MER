@@ -4,12 +4,18 @@ from transformers import WavLMModel, VideoMAEModel
 
 
 class PretrainModel(nn.Module):
-    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float, pretrained_model_file: str):
+    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float, 
+                 pretrained_model_file: str, prepretrained_dataset: str, prepretrained_classnum: int):
         super(PretrainModel, self).__init__()
 
         self.input_modality = input_modality
         self.hidden_dim = hidden_dim
         self.dropout_rate = dropout_rate
+
+        if (prepretrained_dataset == "MOSI"  and  prepretrained_classnum == 2):
+            self.num_classes = 2
+        else:
+            self.num_classes = num_classes
 
         if (input_modality == "audio"):
             self.encoder = WavLMModel.from_pretrained("microsoft/wavlm-base")
@@ -60,7 +66,7 @@ class PretrainModel(nn.Module):
             nn.LayerNorm(self.hidden_dim),
             nn.GELU(),
             nn.Dropout(self.dropout_rate),
-            nn.Linear(self.hidden_dim, num_classes)
+            nn.Linear(self.hidden_dim, self.num_classes)
         )
 
         # 入力: grpoup1, group2, group3, group4 のいずれかのprivate特徴量
