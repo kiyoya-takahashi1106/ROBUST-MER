@@ -5,24 +5,30 @@ from transformers import WavLMModel, RobertaModel, VideoMAEModel
 
 
 class PrepretrainModel(nn.Module):
-    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float):
+    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float, dataset: str):
         super(PrepretrainModel, self).__init__()
         self.input_modality = input_modality
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
 
+        # audio
         if (input_modality == "audio"):
             self.encoder = WavLMModel.from_pretrained("microsoft/wavlm-base")
             for p in self.encoder.parameters():
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
             for n, p in self.encoder.named_parameters():
-                if any(f"encoder.layers.{i}." in n for i in [L - 2, L - 1]):
-                    p.requires_grad = True
+                if (dataset == "CREMA-D"):
+                    if any(f"encoder.layers.{i}." in n for i in [L - 3, L -2, L - 1]):
+                        p.requires_grad = True
+                elif (dataset == "MOSI"):
+                    if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
+                        p.requires_grad = True
             for n, p in self.encoder.named_parameters():
                 if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
                     p.requires_grad = True
 
+        # text
         # dataset: CREMA-Dの時は使わない
         elif (input_modality == "text"):
             self.encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
@@ -30,20 +36,26 @@ class PrepretrainModel(nn.Module):
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
             for n, p in self.encoder.named_parameters():
-                if any(f"encoder.layer.{i}." in n for i in [L - 2, L - 1]):
+                if any(f"encoder.layer.{i}." in n for i in [L - 3, L - 2, L - 1]):
                     p.requires_grad = True
             for n, p in self.encoder.named_parameters():
                 if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
                     p.requires_grad = True
 
+        # video
         elif (input_modality == "video"):
             self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
             for p in self.encoder.parameters():
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
+
             for n, p in self.encoder.named_parameters():
-                if any(f"encoder.layer.{i}." in n for i in [L - 2, L - 1]):
-                    p.requires_grad = True
+                if (dataset == "CREMA-D"):
+                    if any(f"encoder.layers.{i}." in n for i in [L - 3, L -2, L - 1]):
+                        p.requires_grad = True
+                elif (dataset == "MOSI"):
+                    if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
+                        p.requires_grad = True
             for n, p in self.encoder.named_parameters():
                 if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
                     p.requires_grad = True
@@ -52,6 +64,10 @@ class PrepretrainModel(nn.Module):
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(dropout_rate)
         self.decoder = nn.Linear(self.hidden_dim, self.num_classes)
+
+        trainable = sum(p.numel() for p in self.encoder.parameters() if p.requires_grad)
+        total     = sum(p.numel() for p in self.encoder.parameters())
+        print(f"Trainable params: {trainable/1e6:.2f}M / {total/1e6:.2f}M")
 
 
     def forward(self, x, attn_mask):
@@ -71,7 +87,7 @@ class PrepretrainModel(nn.Module):
         elif (self.input_modality == "video"):
             outputs = self.encoder(x)
             hidden = outputs.last_hidden_state        
-            f = hidden.mean(dim=1)
+            f = hidden[:, 0, :]
         
         f = self.layer_norm(f)
         f = self.gelu(f)
