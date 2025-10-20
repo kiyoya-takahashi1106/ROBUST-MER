@@ -53,8 +53,9 @@ def split_actor():
                 group_dct["group4"].append(actor_id)
 
     # グループ内でシャッフル
+    rng = random.Random(2025)
     for group_name, actor_lst in group_dct.items():
-        random.shuffle(actor_lst)
+        rng.shuffle(actor_lst)
     
     train_actor_lst = []
     val_actor_lst = []
