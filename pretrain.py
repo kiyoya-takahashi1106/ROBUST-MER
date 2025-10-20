@@ -19,7 +19,7 @@ from datetime import datetime
 date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.pretrain_dataset import CREMADDataProvider, CREMADDataset
+from utils.pretrain_dataset import CREMADDataset
 from utils.function import SIMLOSS, DIFFLOSS, RECONLOSS, DISCRIMINATORLOSS
 
 print(torch.__version__)
@@ -93,12 +93,13 @@ def train(args):
         avg_loss = []
 
         # dataloaderの準備
-        data_provider = CREMADDataProvider(seed=args.seed, epoch=epoch, prepretrained_dataset=args.prepretrained_dataset, prepretrained_classnum=args.prepretrained_classnum)
-        train_data, val_data = data_provider.get_dataset()
-        train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
-        val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
+        train_dataset = CREMADDataset(split="train", input_modality=args.input_modality, epoch=epoch, prepretrained_dataset=args.prepretrained_dataset, prepretrained_classnum=args.prepretrained_classnum)
+        val_dataset = CREMADDataset(split="val", input_modality=args.input_modality, epoch=epoch, prepretrained_dataset=args.prepretrained_dataset, prepretrained_classnum=args.prepretrained_classnum)
         train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
         val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+        if (epoch == 0):
+            print(f"Number of training samples: {len(train_dataset)}")
+            print(f"Number of validation samples: {len(val_dataset)}")
 
         for batch in tqdm(train_dataloader):
             # バッチから画像、テキスト、ラベルを取得
