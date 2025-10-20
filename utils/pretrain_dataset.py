@@ -12,9 +12,11 @@ torchaudio.set_audio_backend("soundfile")
 import random
 import pandas as pd
 import numpy as np
+import os
 
 
 """
+# 1, 2, 3, 4 のlistすべて同じ要素数
 sentence_emotion_group_dct = {
     sentence1_emotion1: {1: [filename ...], 2: [], 3: [], 4: []},
     sentence1_emotion2: {1: [], 2: [], 3: [], 4: []},
@@ -33,25 +35,17 @@ train_dataset = [
 """
 
 
-class CREMADDataProvider:
-    def __init__(self, seed, epoch, prepretrained_dataset, prepretrained_classnum):
-        self.seed = seed
+class CREMADDataset(Dataset):
+    def __init__(self, split, input_modality, epoch, prepretrained_dataset, prepretrained_classnum):
+        self.split = split
+        self.input_modality = input_modality
         self.epoch = epoch
+
         self.prepretrained_dataset = prepretrained_dataset
         self.prepretrained_classnum = prepretrained_classnum
-        self.train_sentence_emotion_group_dct, self.val_sentence_emotion_group_dct = cremed_classification(seed, epoch)
-        self.train_dataset = make_data_combination(self.train_sentence_emotion_group_dct, self.prepretrained_dataset, self.prepretrained_classnum)
-        self.val_dataset = make_data_combination(self.val_sentence_emotion_group_dct, self.prepretrained_dataset, self.prepretrained_classnum)
 
-    def get_dataset(self):
-        return self.train_dataset, self.val_dataset
-
-
-
-class CREMADDataset(Dataset):
-    def __init__(self, data, input_modality):
-        self.data = data
-        self.input_modality = input_modality
+        self.sentence_emotion_group_dct = cremed_classification(split, input_modality, epoch)
+        self.data = make_data_combination(self.sentence_emotion_group_dct, self.prepretrained_dataset, self.prepretrained_classnum)
 
         if (self.input_modality == "audio") :
             self.processor = AutoFeatureExtractor.from_pretrained("microsoft/wavlm-base-plus")
@@ -72,76 +66,64 @@ class CREMADDataset(Dataset):
 
 
 
-# すべてのデータを (テキスト12 × 感情6) × grpoup4 に分類するし、それをtrainとvalに分割
-def cremed_classification(seed, epoch):
-    # CSVファイルを読み込み
+# すべてactorを4分割して、
+def cremed_classification(split, input_modality, epoch):
+    group_dct = {"group1": [], "group2": [], "group3": [], "group4": []}
     actors_file = pd.read_csv('./data/CREMA-D/raw/VideoDemographics.csv')
-    actors_file_content = actors_file.copy()
-    datas_file = pd.read_csv('./data/CREMA-D/raw/SentenceFilenames.csv')
-    datas_file_content = datas_file.copy()
-
-    # 各actorがgroupのどこに属するかを確認
-    actor_dct = {}
     age_threshold = 40
-    for _, row in actors_file_content.iterrows():
+    for _, row in actors_file.iterrows():
         actor_id = row["ActorID"]
         age = row["Age"]
         gender = row["Sex"]
-            
-        if age <= age_threshold:
-            if gender == 'Male':  
-                actor_dct[actor_id] = 1
-            else:  
-                actor_dct[actor_id] = 3
-        else: 
-            if gender == 'Male':
-                actor_dct[actor_id] = 2
+        if (age < age_threshold):
+            if (gender == 'Male'):
+                group_dct["group1"].append(actor_id)
             else:
-                actor_dct[actor_id] = 4
+                group_dct["group3"].append(actor_id)
+        else:
+            if (gender == 'Male'):
+                group_dct["group2"].append(actor_id)
+            else:
+                group_dct["group4"].append(actor_id)
 
-    sentence_emotion_group_dct = {}   # テキスト_感情_group -> datafile名のリスト
-    for _, row in datas_file_content.iterrows():
-        filename = row["Filename"]
+    
+    sentence_emotion_group_dct = {}
+    data_folder = f"./data/CREMA-D/{split}/{"AudioWAV" if input_modality == "audio" else "VideoFlash"}/"
+    for filename in os.listdir(data_folder):
+        if (input_modality == "audio"):
+            filename = filename.replace(".wav", "")
+        elif (input_modality == "video"):
+            filename = filename.replace(".flv", "")
         part = filename.split('_')
         actor_id = int(part[0])
+        for group_num, actor_lst in group_dct.items():
+            if actor_id in actor_lst:
+                actor_group = int(group_num[-1])    # "group1" -> 1
+                break
         sentence_emotion = part[1] + "_" + part[2]
 
-        if sentence_emotion not in sentence_emotion_group_dct:
+        if (sentence_emotion not in sentence_emotion_group_dct):
             sentence_emotion_group_dct[sentence_emotion] = {1: [], 2: [], 3: [], 4: []}
-        
-        actor_group = actor_dct[actor_id]
         sentence_emotion_group_dct[sentence_emotion][actor_group].append(filename)
 
-    # train/val分割
-    train_sentence_emotion_group_dct = {}
-    val_sentence_emotion_group_dct = {}
-    rng = random.Random(seed)   # valの組み合わせは毎回同じ
-    epoch_rng = random.Random(seed + epoch)   # epochごとにtrainの組み合わせを変える
     
+    # 各リストの要素のずれをなくす (最小値に合わせる)
     for sentence_emotion, group_dct in sentence_emotion_group_dct.items():
         min_len = min(len(group_dct[1]), len(group_dct[2]), len(group_dct[3]), len(group_dct[4]))
-        train_sentence_emotion_group_dct[sentence_emotion] = {1: [], 2: [], 3: [], 4: []}
-        val_sentence_emotion_group_dct[sentence_emotion] = {1: [], 2: [], 3: [], 4: []}
-
         for group_num in [1, 2, 3, 4]:
-            filename_lst = group_dct[group_num].copy()
-            rng.shuffle(filename_lst)
-            
-            val_num = int(min_len * 0.2)
-            val_filename_lst = filename_lst[:val_num]
-            val_sentence_emotion_group_dct[sentence_emotion][group_num] = val_filename_lst
+            # 学習のときは組み合わせにランダム性を持たせる
+            if (split == "train"):
+                rng = random.Random(epoch + group_num)
+            else:
+                rng = random.Random(group_num)
+            rng.shuffle(group_dct[group_num])
+            group_dct[group_num] = group_dct[group_num][:min_len]
 
-            train_filename_lst = filename_lst[val_num:]
-            epoch_rng.shuffle(train_filename_lst)
-            if (len(train_filename_lst) > min_len-val_num):
-                train_filename_lst = train_filename_lst[:min_len-val_num]
-            train_sentence_emotion_group_dct[sentence_emotion][group_num] = train_filename_lst
-
-    return train_sentence_emotion_group_dct, val_sentence_emotion_group_dct
+    return sentence_emotion_group_dct
 
 
 
-#  train/valデータを作成 (要素はfilename)
+#  実際のデータを作成 (要素はfilename)
 def make_data_combination(sentence_emotion_group_dct, prepretrained_dataset, prepretrained_classnum):
     data = []
     if (prepretrained_dataset == "MOSI" and prepretrained_classnum == 2):
@@ -168,7 +150,7 @@ def make_data_combination(sentence_emotion_group_dct, prepretrained_dataset, pre
 # 指定されたファイルの各データに対して前処理を行いテンソルで返す
 def pre_process(filename, input_modality, processor):
     parent_dir = "AudioWAV" if input_modality == "audio" else "VideoFlash"
-    file_path = f"data/CREMA-D/raw/{parent_dir}/{filename}"
+    file_path = f"./data/CREMA-D/raw/{parent_dir}/{filename}"
     
     # モダリティ別処理
     if (input_modality == "audio"):
