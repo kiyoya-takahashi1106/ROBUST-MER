@@ -37,6 +37,7 @@ def args():
     parser.add_argument("--hidden_dim", default=768, type=int)
     parser.add_argument("--dropout_rate", default=0.3, type=float)
     parser.add_argument("--patience", default=5, type=int, help="Early stopping patience")
+    parser.add_argument("--cremad_weight_file", default="", type=str, help="CREMA-D pretrained model weight file path")
     args = parser.parse_args()
     return args
 
@@ -48,7 +49,8 @@ def train(args):
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
         dropout_rate=args.dropout_rate,
-        dataset=args.dataset_name
+        dataset=args.dataset_name,
+        cremad_weight_file=args.cremad_weight_file
     )
     
     # TensorBoard Writer設定
