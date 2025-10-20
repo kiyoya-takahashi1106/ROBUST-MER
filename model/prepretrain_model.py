@@ -18,10 +18,10 @@ class PrepretrainModel(nn.Module):
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
             for n, p in self.encoder.named_parameters():
-                if (dataset == "CREMA-D"):
+                if (dataset == "MOSI"):
                     if any(f"encoder.layers.{i}." in n for i in [L - 3, L -2, L - 1]):
                         p.requires_grad = True
-                elif (dataset == "MOSI"):
+                elif (dataset == "CREMA-D"):
                     if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
                         p.requires_grad = True
             for n, p in self.encoder.named_parameters():
@@ -50,12 +50,8 @@ class PrepretrainModel(nn.Module):
             L = self.encoder.config.num_hidden_layers
 
             for n, p in self.encoder.named_parameters():
-                if (dataset == "CREMA-D"):
-                    if any(f"encoder.layers.{i}." in n for i in [L - 3, L -2, L - 1]):
-                        p.requires_grad = True
-                elif (dataset == "MOSI"):
-                    if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
-                        p.requires_grad = True
+                if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
+                    p.requires_grad = True
             for n, p in self.encoder.named_parameters():
                 if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
                     p.requires_grad = True
