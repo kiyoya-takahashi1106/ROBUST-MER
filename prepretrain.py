@@ -19,8 +19,7 @@ from datetime import datetime
 date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.prepretrain_dataset_CREMAD import CREMADDataProvider, CREMADDataset
-from utils.prepretrain_dataset import MOSIDataset
+from utils.prepretrain_dataset_CREMAD import CREMADDataset
 
 print(torch.__version__)
 
@@ -61,15 +60,14 @@ def train(args):
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
 
     if (args.dataset_name == "CREMA-D"):
-        data_provider = CREMADDataProvider(args.seed)
-        train_data, val_data = data_provider.get_dataset()
-        train_dataset = CREMADDataset(train_data, input_modality=args.input_modality)
-        val_dataset = CREMADDataset(val_data, input_modality=args.input_modality)
+        train_dataset = CREMADDataset("train", input_modality=args.input_modality)
+        val_dataset = CREMADDataset("val", input_modality=args.input_modality)
     elif (args.dataset_name == "MOSI"):
         train_dataset = MOSIDataset(dataset=args.dataset_name, split="train", input_modality=args.input_modality, class_num=args.class_num)
         val_dataset = MOSIDataset(dataset=args.dataset_name, split="valid", input_modality=args.input_modality, class_num=args.class_num)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
+
     print("Train dataset size:", len(train_dataset))
     print("Valid dataset size:", len(val_dataset))
     
