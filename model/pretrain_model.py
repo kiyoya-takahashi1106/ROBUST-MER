@@ -27,14 +27,15 @@ class PretrainModel(nn.Module):
 
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
 
-        self.load_pretrained_layer_weights(premodel_path)
-        for param in self.encoder.parameters():
-            param.requires_grad = False
-        for param in self.layer_norm.parameters():
-            param.requires_grad = False
+        if (pretrained_model_file != "test.pth"):
+            self.load_pretrained_layer_weights(premodel_path)
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            for param in self.layer_norm.parameters():
+                param.requires_grad = False
 
-        self.check_pretrained_loaded(self.encoder, premodel_path, prefix="encoder.")
-        self.check_pretrained_loaded(self.layer_norm, premodel_path, prefix="layer_norm.")
+            self.check_pretrained_loaded(self.encoder, premodel_path, prefix="encoder.")
+            self.check_pretrained_loaded(self.layer_norm, premodel_path, prefix="layer_norm.")
 
         # shared division encoder
         self.shared = nn.Sequential(
