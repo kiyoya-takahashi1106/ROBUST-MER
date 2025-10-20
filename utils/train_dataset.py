@@ -112,12 +112,24 @@ def pre_process(dataset, split, filename, audio_processor, video_processor):
     
     # ===== 2. Video 処理 =====
     vr = VideoReader(str(video_path))
-    T = 16
-    indices = np.linspace(0, len(vr) - 1, T).astype(int)
+    T = len(vr)
+    clip_len = 16
+
+    if T <= clip_len:
+        # 短い動画なら等間隔サンプリング
+        indices = np.linspace(0, T - 1, clip_len).astype(int)
+    else:
+        # --- 連続16フレーム ---
+        if split == "train":
+            start = np.random.randint(0, T - clip_len + 1)
+        else:
+            start = max(0, (T - clip_len) // 2)
+        indices = np.arange(start, start + clip_len)
+
     frames = [vr[i].asnumpy() for i in indices]
     processor_output = video_processor(frames, return_tensors="pt")
     video = processor_output['pixel_values'].squeeze(0)
-    video_mask = torch.ones((T,), dtype=torch.long)   # ★ None を避ける
+    video_mask = torch.ones((clip_len,), dtype=torch.long)
 
     # ===== 3. Label 取得 =====
     df = pd.read_csv(label_csv_path)
@@ -127,7 +139,6 @@ def pre_process(dataset, split, filename, audio_processor, video_processor):
     
     row = df[(df['video_id'] == video_id) & (df['clip_id'] == clip_id)]
     label = float(row.iloc[0]['label'])
-
     label = torch.tensor(label, dtype=torch.float32)
 
     return audio, video, audio_mask, video_mask, label
