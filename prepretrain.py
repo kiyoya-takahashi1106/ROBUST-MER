@@ -19,7 +19,7 @@ from datetime import datetime
 date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.prepretrain_dataset_MOSI import MOSIDataset
+from utils.prepretrain_dataset import MOSIDataset
 
 print(torch.__version__)
 
