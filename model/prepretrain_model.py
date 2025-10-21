@@ -15,7 +15,8 @@ class PrepretrainModel(nn.Module):
         # video
         self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
         self.layer_norm = nn.LayerNorm(self.hidden_dim)
-        self.load_pretrained_layer_weights(self.pretrained_model_path)
+        if (self.pretrained_model_path != "test.pth"):
+            self.load_pretrained_layer_weights(self.pretrained_model_path)
 
         for p in self.encoder.parameters():
             p.requires_grad = False
