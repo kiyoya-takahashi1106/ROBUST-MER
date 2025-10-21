@@ -38,8 +38,8 @@ class Model(nn.Module):
                 param.requires_grad = False
             for param in self.text_encoder_layer_norm.parameters():
                 param.requires_grad = False
-            self.check_pretrained_loaded(self.text_encoder, text_path, prefix="encoder.")
-            self.check_pretrained_loaded(self.text_encoder_layer_norm, text_path, prefix="layer_norm.")
+            # self.check_pretrained_loaded(self.text_encoder, text_path, prefix="encoder.")
+            # self.check_pretrained_loaded(self.text_encoder_layer_norm, text_path, prefix="layer_norm.")
 
         # 映像 (事前学習済み)
         self.video_encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
@@ -66,23 +66,8 @@ class Model(nn.Module):
                 param.requires_grad = False
             self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
             self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
-        self.audio_shared_dropout = nn.Dropout(self.dropout_rate)
 
-        # テキスト
-        self.text_shared_dropout = nn.Dropout(self.dropout_rate)
-
-        # 映像
-        self.video_shared = nn.Linear(self.hidden_dim, self.hidden_dim)
-        self.video_shared_layer_norm = nn.LayerNorm(self.hidden_dim)
-        if (video_pretrained_model_file != "test.pth"):
-            self.load_pretrained_division_layer_weights(self.video_shared, self.video_shared_layer_norm, video_path)
-            for param in self.video_shared.parameters():
-                param.requires_grad = False
-            for param in self.video_shared_layer_norm.parameters():
-                param.requires_grad = False
-            self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
-            self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
-        self.video_shared_dropout = nn.Dropout(self.dropout_rate)
+        self.dropout = nn.Dropout(dropout_rate)
 
 
         # fusion
@@ -100,6 +85,7 @@ class Model(nn.Module):
                 nn.LayerNorm(self.hidden_dim),
                 nn.GELU(),
             )
+
 
         # decoder
         self.decoder = nn.Linear(self.hidden_dim, num_classes)
@@ -180,7 +166,7 @@ class Model(nn.Module):
 
 
 
-    def one_forward(self, modality, x, encoder, attn_mask, encoder_layer_norm, linear, shared_layer_norm, dropout):
+    def one_forward(self, modality, x, encoder, attn_mask, encoder_layer_norm, linear, shared_layer_norm):
         if (modality == "audio"): 
             with torch.no_grad():
                 encoder_output = encoder(x, attention_mask=attn_mask)
@@ -188,19 +174,13 @@ class Model(nn.Module):
                 f = encoder_layer_norm(f)
                 f = linear(f)
                 f = shared_layer_norm(f)
-        elif (modality == "text"):
-            encoder_output = encoder(x, attention_mask=attn_mask)
-            f = encoder_output.last_hidden_state[:, 0, :]   # CLSトークン
-            f = encoder_layer_norm(f)
         elif (modality == "video"):
             with torch.no_grad():
                 encoder_output = encoder(x, attention_mask=attn_mask)
                 hidden = encoder_output.last_hidden_state
                 f = hidden[:, 0, :]
                 f = encoder_layer_norm(f)
-                f = linear(f)
-                f = shared_layer_norm(f)
-        f = dropout(f)
+        f = self.dropout(f)
         return f
 
 
@@ -217,18 +197,13 @@ class Model(nn.Module):
             text_f, video_f, audio_f: 各モダリティの特徴量 (batch_size, hidden_dim)
         """
 
-        audio_divided_f = self.one_forward("audio", audio_x, self.audio_encoder, audio_attn_mask, self.audio_encoder_layer_norm, self.audio_shared, self.audio_shared_layer_norm, self.audio_shared_dropout)
+        audio_divided_f = self.one_forward("audio", audio_x, self.audio_encoder, audio_attn_mask, self.audio_encoder_layer_norm, self.audio_shared, self.audio_shared_layer_norm)
         if (self.dataset_name != "CREMA-D"):
-            text_divided_f = self.one_forward("text", text_x, self.text_encoder, text_attn_mask, self.text_encoder_layer_norm, None, None, self.text_shared_dropout)
-        video_divided_f = self.one_forward("video", video_x, self.video_encoder, video_attn_mask, self.video_encoder_layer_norm, self.video_shared, self.video_shared_layer_norm, self.video_shared_dropout)
-
+            text_divided_f = self.one_forward("text", text_x, self.text_encoder, text_attn_mask, self.text_encoder_layer_norm, None, None)
+        video_divided_f = self.one_forward("video", video_x, self.video_encoder, video_attn_mask, self.video_encoder_layer_norm, None, None)
+        
         if (self.dataset_name == "CREMA-D"):
             fusion_f = torch.cat((audio_divided_f, video_divided_f), dim=1)
-            fusion_f = self.fusion(fusion_f)
-        elif (self.dataset_name == "MOSI"):
-            fusion_f = torch.stack((audio_divided_f, text_divided_f, video_divided_f), dim=0)
-            fusion_f = self.transformer_encoder(fusion_f)
-            fusion_f = torch.cat((fusion_f[0], fusion_f[1], fusion_f[2]), dim=1)
             fusion_f = self.fusion(fusion_f)
 
         y = self.decoder(fusion_f)

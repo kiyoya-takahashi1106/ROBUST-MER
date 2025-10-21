@@ -31,7 +31,7 @@ def args():
     parser.add_argument("--dropout_rate", default=0.5, type=float)
     parser.add_argument("--epochs", default=100, type=int)
     parser.add_argument("--batch_size", default=20, type=int)
-    parser.add_argument("--dataset_name", default="MOSI", type=str)
+    parser.add_argument("--dataset_name", default="CREMA-D", type=str)
     parser.add_argument("--class_num", default=6, type=int)
     parser.add_argument("--hidden_dim", default=768, type=int)
     parser.add_argument("--audio_pretrained_model_file", type=str)
