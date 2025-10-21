@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from model.prepretrain_model import PrepretrainModel
 import argparse
 from utils.utility import set_seed
-from utils.prepretrain_dataset_CREMAD import CREMADDataset
+from utils.prepretrain_dataset import MOSIDataset
 from tqdm import tqdm
 import numpy as np
 
@@ -29,11 +29,10 @@ def test(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # モデル生成
     model = PrepretrainModel(
-        input_modality=args.input_modality, 
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
         dropout_rate=0.0,
-        dataset=args.dataset_name
+        pretrained_model_file=args.trained_model_file
     )
     model = model.to(device)
 
@@ -44,9 +43,11 @@ def test(args):
 
     model.eval()
 
-    test_dataset = CREMADDataset(
+    test_dataset = MOSIDataset(
+        dataset=args.dataset_name,
         split="test", 
-        input_modality=args.input_modality
+        input_modality=args.input_modality,
+        class_num=args.class_num
     )
     test_dataloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
     print("Test dataset size:", len(test_dataset))
