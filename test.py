@@ -8,9 +8,9 @@ from model.train_model import Model
 import argparse
 from utils.utility import set_seed
 from utils.train_dataset_CREMAD import CREMADDataset
-from utils.train_dataset import MOSIDataset
 from tqdm import tqdm
 import numpy as np
+
 
 def args():
     parser = argparse.ArgumentParser()
@@ -25,6 +25,7 @@ def args():
     parser.add_argument("--video_pretrained_model_file", default="test.pth", type=str)
     args = parser.parse_args()
     return args
+
 
 def test(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
