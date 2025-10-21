@@ -5,11 +5,12 @@ EPOCHS=50
 BATCH_SIZE=32
 # MOSIなら2か7
 # CREMA-Dなら6
-DATASET_NAME="CREMA-D"
-CLASS_NUM=6
+DATASET_NAME="MOSI"     # 固定
+CLASS_NUM=2             # 固定
 INPUT_MODALITY="video"
 HIDDEN_DIM=768
 DROPOUT_RATE=0.3
+PRETRAINED_MODEL_FILE="CREMA-D_classNum6_20251021_091649_epoch8_0.7788_seed42_dropout0.3.pth"
 PATIENCE=5
 
 
@@ -26,5 +27,6 @@ python -u prepretrain.py \
     --input_modality  $INPUT_MODALITY \
     --hidden_dim $HIDDEN_DIM \
     --dropout_rate $DROPOUT_RATE \
+    --pretrained_model_file $PRETRAINED_MODEL_FILE \
     --patience $PATIENCE \
     2>&1 | tee "$LOG_FILE"
