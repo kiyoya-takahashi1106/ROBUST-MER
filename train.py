@@ -64,10 +64,8 @@ def train(args):
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
 
     if (args.dataset_name == "CREMA-D"):
-        data_provider = CREMADDataProvider(args.seed)
-        train_data, val_data = data_provider.get_dataset()
-        train_dataset = CREMADDataset(train_data)
-        val_dataset = CREMADDataset(val_data)
+        train_dataset = CREMADDataset("train")
+        val_dataset = CREMADDataset("val")
     elif (args.dataset_name == "MOSI"):
         train_dataset = MOSIDataset(dataset=args.dataset_name, split="train", class_num=args.class_num)
         val_dataset = MOSIDataset(dataset=args.dataset_name, split="valid", class_num=args.class_num)
@@ -89,8 +87,9 @@ def train(args):
 
         for batch in tqdm(train_dataloader):
             if (args.dataset_name == "CREMA-D"):
-                audio_x, video_x, audio_attn_mask, video_attn_mask, label = batch
+                audio_x, video_x, audio_attn_mask, video_attn_mask, label, _ = batch
                 text_x, text_attn_mask = None, None
+                _ = _.to(device)
             elif (args.dataset_name == "MOSI"):
                 audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask, label = batch
                 text_x = text_x.to(device)
@@ -127,10 +126,13 @@ def train(args):
         with torch.no_grad():
             correct = 0
             total = 0
+            group_num_dct = {0:0, 1:0, 2:0, 3:0}
+            group_correct_dct = {0:0, 1:0, 2:0, 3:0}
             for _, batch in enumerate(tqdm(val_dataloader)):
                 if (args.dataset_name == "CREMA-D"):
-                    audio_x, video_x, audio_attn_mask, video_attn_mask, label = batch
+                    audio_x, video_x, audio_attn_mask, video_attn_mask, label, group_label = batch
                     text_x, text_attn_mask = None, None
+                    group_label = group_label.to(device)
                 elif (args.dataset_name == "MOSI"):
                     audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask, label = batch
                     text_x = text_x.to(device)
@@ -148,11 +150,23 @@ def train(args):
                 correct += (predictions == label).sum().item()
                 total += label.size(0)
 
+                # グループごとの問題数、正解数をカウント
+                if (args.dataset_name == "CREMA-D"):
+                    for i in range(label.size(0)):
+                        group = group_label[i].item()
+                        group_num_dct[group] += 1
+                        if (predictions[i] == label[i]):
+                            group_correct_dct[group] += 1
+
         accuracy = correct / total
         acc_lst.append(accuracy)
 
         writer.add_scalar('Accuracy/Val', accuracy, epoch)
         print(f"Epoch {epoch} Accuracy: {accuracy:.4f}")
+
+        if (args.dataset_name == "CREMA-D"):
+            for group in group_num_dct.keys():
+                print(f"Group{group}:  {group_correct_dct[group]} / {group_num_dct[group]}")
 
         if (accuracy >= best_acc):
             best_acc = accuracy
