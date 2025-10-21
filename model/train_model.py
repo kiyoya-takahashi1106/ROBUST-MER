@@ -13,60 +13,60 @@ class Model(nn.Module):
         self.dataset_name = dataset_name
 
         audio_path = "./saved_models/pretrain/audio/" + audio_pretrained_model_file
-        text_path = "./saved_models/prepretrain/text/" + text_pretrained_model_file
-        video_path = "./saved_models/prepretrain/video/" + video_pretrained_model_file
+        text_path = "./saved_models/pretrain/text/" + text_pretrained_model_file
+        video_path = "./saved_models/pretrain/video/" + video_pretrained_model_file
 
         # Encoder + LN
         # 音声 (事前学習済み)
         self.audio_encoder = WavLMModel.from_pretrained("microsoft/wavlm-base")
         self.audio_encoder_layer_norm = nn.LayerNorm(self.hidden_dim)
-        self.load_pretrained_encoder_layer_weights(self.audio_encoder, self.audio_encoder_layer_norm, audio_path)
-        for param in self.audio_encoder.parameters():
-            param.requires_grad = False
-        for param in self.audio_encoder_layer_norm.parameters():
-            param.requires_grad = False
-
-        self.check_pretrained_loaded(self.audio_encoder, audio_path, prefix="encoder.")
-        self.check_pretrained_loaded(self.audio_encoder_layer_norm, audio_path, prefix="layer_norm.")
+        if (audio_pretrained_model_file != "test.pth"):
+            self.load_pretrained_encoder_layer_weights(self.audio_encoder, self.audio_encoder_layer_norm, audio_path)
+            for param in self.audio_encoder.parameters():
+                param.requires_grad = False
+            for param in self.audio_encoder_layer_norm.parameters():
+                param.requires_grad = False
+            self.check_pretrained_loaded(self.audio_encoder, audio_path, prefix="encoder.")
+            self.check_pretrained_loaded(self.audio_encoder_layer_norm, audio_path, prefix="layer_norm.")
 
         # テキスト
         self.text_encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
         self.text_encoder_layer_norm = nn.LayerNorm(self.hidden_dim)
-        self.load_pretrained_encoder_layer_weights(self.text_encoder, self.text_encoder_layer_norm, text_path)
-        for param in self.text_encoder.parameters():
-            param.requires_grad = False
-        for param in self.text_encoder_layer_norm.parameters():
-            param.requires_grad = False
-
-        self.check_pretrained_loaded(self.text_encoder, text_path, prefix="encoder.")
-        self.check_pretrained_loaded(self.text_encoder_layer_norm, text_path, prefix="layer_norm.")
+        if (text_pretrained_model_file != "test.pth"):
+            self.load_pretrained_encoder_layer_weights(self.text_encoder, self.text_encoder_layer_norm, text_path)
+            for param in self.text_encoder.parameters():
+                param.requires_grad = False
+            for param in self.text_encoder_layer_norm.parameters():
+                param.requires_grad = False
+            self.check_pretrained_loaded(self.text_encoder, text_path, prefix="encoder.")
+            self.check_pretrained_loaded(self.text_encoder_layer_norm, text_path, prefix="layer_norm.")
 
         # 映像 (事前学習済み)
         self.video_encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
         self.video_encoder_layer_norm = nn.LayerNorm((self.hidden_dim))
-        self.load_pretrained_encoder_layer_weights(self.video_encoder, self.video_encoder_layer_norm, video_path)
-        for param in self.video_encoder.parameters():
-            param.requires_grad = False
-        for param in self.video_encoder_layer_norm.parameters():
-            param.requires_grad = False
-
-        self.check_pretrained_loaded(self.video_encoder, video_path, prefix="encoder.")
-        self.check_pretrained_loaded(self.video_encoder_layer_norm, video_path, prefix="layer_norm.")
+        if (video_pretrained_model_file != "test.pth"):
+            self.load_pretrained_encoder_layer_weights(self.video_encoder, self.video_encoder_layer_norm, video_path)
+            for param in self.video_encoder.parameters():
+                param.requires_grad = False
+            for param in self.video_encoder_layer_norm.parameters():
+                param.requires_grad = False
+            self.check_pretrained_loaded(self.video_encoder, video_path, prefix="encoder.")
+            self.check_pretrained_loaded(self.video_encoder_layer_norm, video_path, prefix="layer_norm.")
 
 
         # 共通分離
         # 音声
         self.audio_shared = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.audio_shared_layer_norm = nn.LayerNorm(self.hidden_dim)
-        self.load_pretrained_division_layer_weights(self.audio_shared, self.audio_shared_layer_norm, audio_path)
-        for param in self.audio_shared.parameters():
-            param.requires_grad = False
-        for param in self.audio_shared_layer_norm.parameters():
-            param.requires_grad = False
+        if (audio_pretrained_model_file != "test.pth"):
+            self.load_pretrained_division_layer_weights(self.audio_shared, self.audio_shared_layer_norm, audio_path)
+            for param in self.audio_shared.parameters():
+                param.requires_grad = False
+            for param in self.audio_shared_layer_norm.parameters():
+                param.requires_grad = False
+            self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
+            self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
         self.audio_shared_dropout = nn.Dropout(self.dropout_rate)
-
-        self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
-        self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
 
         # テキスト
         self.text_shared_dropout = nn.Dropout(self.dropout_rate)
@@ -74,15 +74,15 @@ class Model(nn.Module):
         # 映像
         self.video_shared = nn.Linear(self.hidden_dim, self.hidden_dim)
         self.video_shared_layer_norm = nn.LayerNorm(self.hidden_dim)
-        self.load_pretrained_division_layer_weights(self.video_shared, self.video_shared_layer_norm, video_path)
-        for param in self.video_shared.parameters():
-            param.requires_grad = False
-        for param in self.video_shared_layer_norm.parameters():
-            param.requires_grad = False
+        if (video_pretrained_model_file != "test.pth"):
+            self.load_pretrained_division_layer_weights(self.video_shared, self.video_shared_layer_norm, video_path)
+            for param in self.video_shared.parameters():
+                param.requires_grad = False
+            for param in self.video_shared_layer_norm.parameters():
+                param.requires_grad = False
+            self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
+            self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
         self.video_shared_dropout = nn.Dropout(self.dropout_rate)
-
-        # self.check_pretrained_loaded(self.audio_shared, audio_path, prefix="shared.0.")
-        # self.check_pretrained_loaded(self.audio_shared_layer_norm, audio_path, prefix="fusion.0.")
 
 
         # fusion
@@ -103,6 +103,7 @@ class Model(nn.Module):
 
         # decoder
         self.decoder = nn.Linear(self.hidden_dim, num_classes)
+
 
 
     def load_pretrained_encoder_layer_weights(self, encoder, layer_norm, path):
@@ -128,6 +129,7 @@ class Model(nn.Module):
 
         encoder.load_state_dict(encoder_weights, strict=False)
         layer_norm.load_state_dict(layer_norm_weights, strict=False)
+
 
 
     def load_pretrained_division_layer_weights(self, linear, layer_norm, path):
@@ -162,6 +164,7 @@ class Model(nn.Module):
             layer_norm.load_state_dict(layer_norm_weights, strict=False)
 
 
+
     def check_pretrained_loaded(self, model, path, prefix="encoder."):
         ckpt = torch.load(path, map_location="cpu")
         sd = ckpt.get("model_state_dict") or ckpt.get("state_dict") or ckpt
@@ -174,6 +177,7 @@ class Model(nn.Module):
             print("✅ Loaded successfully (keys matched)")
         else:
             print("❌ No matching keys — checkpoint not loaded")
+
 
 
     def one_forward(self, modality, x, encoder, attn_mask, encoder_layer_norm, linear, shared_layer_norm, dropout):
@@ -191,14 +195,14 @@ class Model(nn.Module):
         elif (modality == "video"):
             with torch.no_grad():
                 encoder_output = encoder(x, attention_mask=attn_mask)
-                f = encoder_output.last_hidden_state[:, 1:, :].mean(1)
+                hidden = encoder_output.last_hidden_state
+                f = hidden[:, 0, :]
                 f = encoder_layer_norm(f)
-                # f = linear(f)
-                # f = shared_layer_norm(f)
-
+                f = linear(f)
+                f = shared_layer_norm(f)
         f = dropout(f)
-
         return f
+
 
 
     def forward(self, audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask):
@@ -214,7 +218,8 @@ class Model(nn.Module):
         """
 
         audio_divided_f = self.one_forward("audio", audio_x, self.audio_encoder, audio_attn_mask, self.audio_encoder_layer_norm, self.audio_shared, self.audio_shared_layer_norm, self.audio_shared_dropout)
-        text_divided_f = self.one_forward("text", text_x, self.text_encoder, text_attn_mask, self.text_encoder_layer_norm, None, None, self.text_shared_dropout)
+        if (self.dataset_name != "CREMA-D"):
+            text_divided_f = self.one_forward("text", text_x, self.text_encoder, text_attn_mask, self.text_encoder_layer_norm, None, None, self.text_shared_dropout)
         video_divided_f = self.one_forward("video", video_x, self.video_encoder, video_attn_mask, self.video_encoder_layer_norm, self.video_shared, self.video_shared_layer_norm, self.video_shared_dropout)
 
         if (self.dataset_name == "CREMA-D"):
