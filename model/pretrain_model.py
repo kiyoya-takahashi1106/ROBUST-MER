@@ -129,7 +129,8 @@ class PretrainModel(nn.Module):
             if (self.input_modality == "audio"): 
                 f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
             elif (self.input_modality == "video"):
-                f = output_encoder_model.last_hidden_state[:, 1:, :].mean(1)
+                hidden = output_encoder_model.last_hidden_state
+                f = hidden[:, 0, :]
             f = self.layer_norm(f)
 
         s = self.shared(f)
