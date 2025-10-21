@@ -19,8 +19,7 @@ from datetime import datetime
 date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
-from utils.train_dataset_CREMAD import CREMADDataProvider, CREMADDataset
-from utils.train_dataset import MOSIDataset
+from utils.train_dataset_CREMAD import CREMADDataset
 
 print(torch.__version__)
 
