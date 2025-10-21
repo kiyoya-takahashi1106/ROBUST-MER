@@ -57,13 +57,16 @@ def test(args):
 
     correct = 0
     total = 0
+    group_num_dct = {0:0, 1:0, 2:0, 3:0}
+    group_correct_dct = {0:0, 1:0, 2:0, 3:0}
     y_max_values = []
 
     with torch.no_grad():
         for batch in tqdm(test_dataloader):
             if args.dataset_name == "CREMA-D":
-                audio_x, video_x, audio_attn_mask, video_attn_mask, label = batch
+                audio_x, video_x, audio_attn_mask, video_attn_mask, label, group_label = batch
                 text_x, text_attn_mask = None, None
+                group_label = group_label.to(device)
             elif args.dataset_name == "MOSI":
                 audio_x, text_x, video_x, audio_attn_mask, text_attn_mask, video_attn_mask, label = batch
                 text_x = text_x.to(device)
@@ -82,8 +85,21 @@ def test(args):
             max_values = y.max(dim=1)[0]
             y_max_values.extend(max_values.cpu().tolist())
 
+            # グループごとの問題数、正解数をカウント
+            if (args.dataset_name == "CREMA-D"):
+                for i in range(label.size(0)):
+                    group = group_label[i].item()
+                    group_num_dct[group] += 1
+                    if (predictions[i] == label[i]):
+                        group_correct_dct[group] += 1
+
     acc = correct / total if total > 0 else 0
     avg_y_max = np.mean(y_max_values) if y_max_values else 0
+
+    if (args.dataset_name == "CREMA-D"):
+        for group in group_num_dct.keys():
+            print(f"Group{group}:  {group_correct_dct[group]} / {group_num_dct[group]}")
+
     print(f"Test Accuracy: {acc:.4f}")
     print(f"Average of y max values: {avg_y_max:.4f}")
 
