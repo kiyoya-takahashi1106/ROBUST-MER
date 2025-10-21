@@ -6,7 +6,7 @@ from transformers import WavLMModel, VideoMAEModel
 
 
 class No_Linear_Model(nn.Module):
-    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, dataset_name: str, audio_pretrained_model_file: str, text_pretrained_model_file: str = None, video_pretrained_model_file: str = None):
+    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, dataset_name: str, audio_pretrained_model_file: str, video_pretrained_model_file: str):
         super(No_Linear_Model, self).__init__()
         self.hidden_dim = hidden_dim
 
@@ -42,6 +42,7 @@ class No_Linear_Model(nn.Module):
             self.check_pretrained_loaded(self.video_encoder_layer_norm, video_path, prefix="layer_norm.")
 
         self.dropout = nn.Dropout(self.dropout_rate)
+
 
         # fusion
         if (self.dataset_name == "CREMA-D"):
@@ -107,12 +108,11 @@ class No_Linear_Model(nn.Module):
 
     def one_forward(self, modality, x, encoder, attn_mask, encoder_layer_norm):
         with torch.no_grad():
-            encoder_output = encoder(x, attention_mask=attn_mask)
-            hidden = encoder_output.last_hidden_state
+            hidden = encoder(x, attention_mask=attn_mask)
             if (modality == "audio"): 
                 f = hidden.last_hidden_state[:, 1:, :].mean(1)
             elif (modality == "video"):
-                f = hidden[:, 0, :]
+                f = hidden.last_hidden_state[:, 0, :]
             f = encoder_layer_norm(f)
         f = self.dropout(f)
         return f
