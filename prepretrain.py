@@ -47,7 +47,8 @@ def train(args):
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
         dropout_rate=args.dropout_rate,
-        pretrained_model_file=args.pretrained_model_file
+        pretrained_model_file=args.pretrained_model_file,
+        input_modality=args.input_modality
     )
     
     # TensorBoard Writer設定

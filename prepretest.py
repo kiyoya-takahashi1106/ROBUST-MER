@@ -32,7 +32,8 @@ def test(args):
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
         dropout_rate=0.0,
-        pretrained_model_file=args.trained_model_file
+        pretrained_model_file=args.trained_model_file,
+        input_modality=args.input_modality
     )
     model = model.to(device)
 

@@ -1,35 +1,65 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import VideoMAEModel  
+from transformers import VideoMAEModel, WavLMModel
 
 
 class PrepretrainModel(nn.Module):
-    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, pretrained_model_file: str):
+    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, pretrained_model_file: str, input_modality: str):
         super(PrepretrainModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
 
-        self.pretrained_model_path = "./saved_models/prepretrain/" + "video" + "/" + pretrained_model_file
+        # self.pretrained_model_path = "./saved_models/prepretrain/" + input_modality + "/" + pretrained_model_file
+
+        # audio
+        if (input_modality == "audio"):
+            self.encoder = WavLMModel.from_pretrained("microsoft/wavlm-base")
+            self.layer_norm = nn.LayerNorm(self.hidden_dim)
+            # self.load_pretrained_layer_weights(self.pretrained_model_path)
+
+            for p in self.encoder.parameters():
+                p.requires_grad = False
+            L = self.encoder.config.num_hidden_layers
+            for n, p in self.encoder.named_parameters():
+                if any(f"encoder.layers.{i}." in n for i in [L - 3, L -2, L - 1]):
+                    p.requires_grad = True
+            for n, p in self.encoder.named_parameters():
+                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
+                    p.requires_grad = True
+
+        # text
+        elif (input_modality == "text"):
+            self.encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
+            for p in self.encoder.parameters():
+                p.requires_grad = False
+            L = self.encoder.config.num_hidden_layers
+            for n, p in self.encoder.named_parameters():
+                if any(f"encoder.layer.{i}." in n for i in [L - 3, L - 2, L - 1]):
+                    p.requires_grad = True
+            for n, p in self.encoder.named_parameters():
+                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
+                    p.requires_grad = True
 
         # video
-        self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-        self.layer_norm = nn.LayerNorm(self.hidden_dim)
-        if (self.pretrained_model_path != "test.pth"):
-            self.load_pretrained_layer_weights(self.pretrained_model_path)
+        elif (input_modality == "video"):
+            self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
+            self.layer_norm = nn.LayerNorm(self.hidden_dim)
+            # self.load_pretrained_layer_weights(self.pretrained_model_path)
 
-        for p in self.encoder.parameters():
-            p.requires_grad = False
-        L = self.encoder.config.num_hidden_layers
-        for n, p in self.encoder.named_parameters():
-            if any(f"encoder.layer.{i}." in n for i in [L -2, L - 1]):
-                p.requires_grad = True
-        for n, p in self.encoder.named_parameters():
-            if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
-                p.requires_grad = True
+            for p in self.encoder.parameters():
+                p.requires_grad = False
+            L = self.encoder.config.num_hidden_layers
+            for n, p in self.encoder.named_parameters():
+                if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
+                    p.requires_grad = True
+            for n, p in self.encoder.named_parameters():
+                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
+                    p.requires_grad = True
 
-        self.check_pretrained_loaded(self.encoder, self.pretrained_model_path, prefix="encoder.")
-        self.check_pretrained_loaded(self.layer_norm, self.pretrained_model_path, prefix="layer_norm.")
+
+        # self.check_pretrained_loaded(self.encoder, self.pretrained_model_path, prefix="encoder.")
+        # self.check_pretrained_loaded(self.layer_norm, self.pretrained_model_path, prefix="layer_norm.")
 
         self.gelu = nn.GELU()
         self.dropout = nn.Dropout(dropout_rate)
