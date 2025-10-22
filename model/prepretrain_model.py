@@ -1,14 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import VideoMAEModel, WavLMModel
+from transformers import VideoMAEModel, WavLMModel, RobertaModel
 
 
 class PrepretrainModel(nn.Module):
-    def __init__(self, hidden_dim: int, num_classes: int, dropout_rate: float, pretrained_model_file: str, input_modality: str):
+    def __init__(self, input_modality: str, hidden_dim: int, num_classes: int, dropout_rate: float, pretrained_model_file: str):
         super(PrepretrainModel, self).__init__()
         self.hidden_dim = hidden_dim
         self.num_classes = num_classes
+        self.input_modality = input_modality
 
         # self.pretrained_model_path = "./saved_models/prepretrain/" + input_modality + "/" + pretrained_model_file
 
@@ -16,47 +17,38 @@ class PrepretrainModel(nn.Module):
         if (input_modality == "audio"):
             self.encoder = WavLMModel.from_pretrained("microsoft/wavlm-base")
             self.layer_norm = nn.LayerNorm(self.hidden_dim)
-            # self.load_pretrained_layer_weights(self.pretrained_model_path)
 
             for p in self.encoder.parameters():
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
             for n, p in self.encoder.named_parameters():
-                if any(f"encoder.layers.{i}." in n for i in [L - 3, L -2, L - 1]):
-                    p.requires_grad = True
-            for n, p in self.encoder.named_parameters():
-                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
+                if any(f"encoder.layers.{i}." in n for i in [L - 3, L - 2, L - 1]):
                     p.requires_grad = True
 
         # text
         elif (input_modality == "text"):
             self.encoder = RobertaModel.from_pretrained("roberta-base", add_pooling_layer=False)
+            self.layer_norm = nn.LayerNorm(self.hidden_dim)
+
             for p in self.encoder.parameters():
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
             for n, p in self.encoder.named_parameters():
                 if any(f"encoder.layer.{i}." in n for i in [L - 3, L - 2, L - 1]):
                     p.requires_grad = True
-            for n, p in self.encoder.named_parameters():
-                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
-                    p.requires_grad = True
 
         # video
         elif (input_modality == "video"):
             self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-            self.layer_norm = nn.LayerNorm(self.hidden_dim)
+            # self.layer_norm = nn.LayerNorm(self.hidden_dim)
             # self.load_pretrained_layer_weights(self.pretrained_model_path)
 
             for p in self.encoder.parameters():
                 p.requires_grad = False
             L = self.encoder.config.num_hidden_layers
             for n, p in self.encoder.named_parameters():
-                if any(f"encoder.layers.{i}." in n for i in [L -2, L - 1]):
+                if any(f"encoder.layer.{i}." in n for i in [L - 2, L - 1]):
                     p.requires_grad = True
-            for n, p in self.encoder.named_parameters():
-                if any(k in n.lower() for k in ["layer_norm", "layernorm", "final_layer_norm"]):
-                    p.requires_grad = True
-
 
         # self.check_pretrained_loaded(self.encoder, self.pretrained_model_path, prefix="encoder.")
         # self.check_pretrained_loaded(self.layer_norm, self.pretrained_model_path, prefix="layer_norm.")
@@ -112,12 +104,23 @@ class PrepretrainModel(nn.Module):
 
 
 
-    def forward(self, x, attn_mask):                    
-        outputs = self.encoder(x)
-        hidden = outputs.last_hidden_state        
-        f = hidden[:, 0, :]
+    def forward(self, x, attn_mask):        
+        if (self.input_modality == "audio"):
+            outputs = self.encoder(input_values=x, attention_mask=attn_mask)
+            hidden = outputs.last_hidden_state
+            f = hidden.mean(dim=1)
+        if (self.input_modality == "text"):
+            x = x.squeeze(1)
+            outputs = self.encoder(input_ids=x, attention_mask=attn_mask)
+            hidden = outputs.last_hidden_state        
+            f = hidden[:, 0, :]
+        if (self.input_modality == "video"):
+            outputs = self.encoder(pixel_values=x, attention_mask=attn_mask)
+            hidden = outputs.last_hidden_state        
+            f = hidden[:, 0, :]
     
-        f = self.layer_norm(f)
+        if (self.input_modality != "video"):
+            f = self.layer_norm(f)
         f = self.gelu(f)
         f = self.dropout(f)
 

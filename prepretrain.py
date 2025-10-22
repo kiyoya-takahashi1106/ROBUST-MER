@@ -20,6 +20,7 @@ date = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 from utils.utility import set_seed
 from utils.prepretrain_dataset import MOSIDataset
+from utils.prepretrain_dataset_CREMAD import CREMADDataset
 
 print(torch.__version__)
 
@@ -44,11 +45,11 @@ def args():
 def train(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = PrepretrainModel(
+        input_modality=args.input_modality,
         hidden_dim=args.hidden_dim, 
         num_classes=args.class_num, 
         dropout_rate=args.dropout_rate,
-        pretrained_model_file=args.pretrained_model_file,
-        input_modality=args.input_modality
+        pretrained_model_file=args.pretrained_model_file
     )
     
     # TensorBoard Writer設定
@@ -60,8 +61,12 @@ def train(args):
     optimizer = torch.optim.AdamW(params=model.parameters(), lr=args.lr, betas=(0.9, 0.999), weight_decay=5e-3)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=0)
 
-    train_dataset = MOSIDataset(dataset=args.dataset_name, split="train", input_modality=args.input_modality, class_num=args.class_num)
-    val_dataset = MOSIDataset(dataset=args.dataset_name, split="valid", input_modality=args.input_modality, class_num=args.class_num)
+    if (args.dataset_name == "MOSI"):
+        train_dataset = MOSIDataset(dataset=args.dataset_name, split="train", input_modality=args.input_modality, class_num=args.class_num)
+        val_dataset = MOSIDataset(dataset=args.dataset_name, split="valid", input_modality=args.input_modality, class_num=args.class_num)
+    elif (args.dataset_name == "CREMA-D"):
+        train_dataset = CREMADDataset(split="train", input_modality=args.input_modality)
+        val_dataset = CREMADDataset(split="val", input_modality=args.input_modality)
     train_dataloader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
     print("Train dataset size:", len(train_dataset))

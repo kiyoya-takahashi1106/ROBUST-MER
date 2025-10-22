@@ -25,7 +25,8 @@ class PretrainModel(nn.Module):
             self.encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
             premodel_path = "./saved_models/prepretrain/video/" + pretrained_model_file
 
-        self.layer_norm = nn.LayerNorm(self.hidden_dim)
+        if (input_modality != "video"):
+            self.layer_norm = nn.LayerNorm(self.hidden_dim)
 
         if (pretrained_model_file != "test.pth"):
             self.load_pretrained_layer_weights(premodel_path)
@@ -35,7 +36,8 @@ class PretrainModel(nn.Module):
                 param.requires_grad = False
 
             self.check_pretrained_loaded(self.encoder, premodel_path, prefix="encoder.")
-            self.check_pretrained_loaded(self.layer_norm, premodel_path, prefix="layer_norm.")
+            if (input_modality != "video"):
+                self.check_pretrained_loaded(self.layer_norm, premodel_path, prefix="layer_norm.")
 
         # shared division encoder
         self.shared = nn.Sequential(
@@ -100,12 +102,14 @@ class PretrainModel(nn.Module):
             if key.startswith("encoder."):
                 new_key = key.replace("encoder.", "", 1)
                 encoder_weights[new_key] = value
-            if key.startswith("layer_norm."):
-                new_key = key.replace("layer_norm.", "")
-                layer_norm_weights[new_key] = value
+            if (self.input_modality != "video"):
+                if key.startswith("layer_norm."):
+                    new_key = key.replace("layer_norm.", "")
+                    layer_norm_weights[new_key] = value
 
         self.encoder.load_state_dict(encoder_weights, strict=False)
-        self.layer_norm.load_state_dict(layer_norm_weights)
+        if (self.input_modality != "video"):
+            self.layer_norm.load_state_dict(layer_norm_weights)
 
 
     def check_pretrained_loaded(self, model, path, prefix):
@@ -131,7 +135,8 @@ class PretrainModel(nn.Module):
             elif (self.input_modality == "video"):
                 hidden = output_encoder_model.last_hidden_state
                 f = hidden[:, 0, :]
-            f = self.layer_norm(f)
+            if (self.input_modality != "video"):
+                f = self.layer_norm(f)
 
         s = self.shared(f)
         p = private(f)

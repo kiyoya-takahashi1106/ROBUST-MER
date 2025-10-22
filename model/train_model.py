@@ -43,7 +43,6 @@ class Model(nn.Module):
 
         # 映像 (事前学習済み)
         self.video_encoder = VideoMAEModel.from_pretrained("MCG-NJU/videomae-base")
-        self.video_encoder_layer_norm = nn.LayerNorm((self.hidden_dim))
         if (video_pretrained_model_file != "test.pth"):
             self.load_pretrained_encoder_layer_weights(self.video_encoder, self.video_encoder_layer_norm, video_path)
             for param in self.video_encoder.parameters():
@@ -51,7 +50,6 @@ class Model(nn.Module):
             for param in self.video_encoder_layer_norm.parameters():
                 param.requires_grad = False
             self.check_pretrained_loaded(self.video_encoder, video_path, prefix="encoder.")
-            self.check_pretrained_loaded(self.video_encoder_layer_norm, video_path, prefix="layer_norm.")
 
 
         # 共通分離
